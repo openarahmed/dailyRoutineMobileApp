@@ -50,8 +50,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#0e0e10",
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
   title: {
     fontSize: 28,

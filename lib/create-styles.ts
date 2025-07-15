@@ -1,0 +1,50 @@
+import { StyleSheet } from "react-native";
+
+export const createStyles = StyleSheet.create({
+  container: { flex: 1, padding: 10, backgroundColor: "#121212" },
+  heading: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#fff",
+    marginTop: 35,
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#555",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: "#333",
+    color: "#fff",
+  },
+  addButton: {
+    backgroundColor: "#4A90E2",
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    shadowColor: "#4A90E2",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 10,
+  },
+  addButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  sessionItem: {
+    backgroundColor: "#1e1e1e",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  sessionTitle: { fontWeight: "bold", fontSize: 16, color: "#fff" },
+  sessionTime: { color: "#aaa" },
+});

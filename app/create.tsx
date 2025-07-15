@@ -104,7 +104,7 @@ export default function CreateRoutineScreen() {
     try {
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: "📚 Study Time!",
+          title: "📚",
           body: `Time to start: ${title}`,
           sound: "default",
         },
@@ -287,7 +287,7 @@ export default function CreateRoutineScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#121212" },
+  container: { flex: 1, padding: 12, backgroundColor: "#121212" },
   heading: {
     fontSize: 28,
     fontWeight: "bold",
