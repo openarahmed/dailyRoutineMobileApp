@@ -23,11 +23,16 @@ Notifications.setNotificationHandler({
 });
 
 const VOICE_NOTIFICATION_TASK = "VOICE_NOTIFICATION_TASK";
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 TaskManager.defineTask(VOICE_NOTIFICATION_TASK, async ({ data, error }) => {
   if (error) { console.error("TaskManager Error:", error); return; }
   if (data) {
     const { voiceMessage } = data as { voiceMessage?: string };
-    if (voiceMessage) Speech.speak(voiceMessage);
+    if (voiceMessage) {
+        await delay(1500); 
+        Speech.speak(voiceMessage);
+    }
   }
 });
 
@@ -71,109 +76,134 @@ export default function HomeScreen() {
   const [currentTask, setCurrentTask] = useState<Session | null>(null);
   const [nextTask, setNextTask] = useState<Session | null>(null);
   const [countdownMs, setCountdownMs] = useState<number | null>(null);
+  const [isCoinInfoModalVisible, setCoinInfoModalVisible] = useState(false); // ✅ নতুন স্টেট
   const allMessages = useRef(["Time to focus on: {task}. Let’s get to work.", "Let’s make progress. Starting: {task}."]).current;
 
   // --- Functions ---
- const scheduleNotification = useCallback(async (title: string, triggerDate: Date) => {
-  const voiceEnabledValue = await AsyncStorage.getItem("voiceNotificationsEnabled");
-  const isVoiceOn = voiceEnabledValue !== "false";
-  const messageTemplate = allMessages[Math.floor(Math.random() * allMessages.length)];
-  const voiceMessage = messageTemplate.replace("{task}", title);
+  const scheduleNotification = useCallback(async (title: string, triggerDate: Date) => {
+    const voiceEnabledValue = await AsyncStorage.getItem("voiceNotificationsEnabled");
+    const isVoiceOn = voiceEnabledValue !== "false";
+    const messageTemplate = allMessages[Math.floor(Math.random() * allMessages.length)];
+    const voiceMessage = messageTemplate.replace("{task}", title);
 
-  const now = new Date();
-
-  if (triggerDate.getTime() <= now.getTime()) {
-    triggerDate.setDate(triggerDate.getDate() + 1);
-  }
-
-  console.log(`⏰ Scheduling "${title}" at ${triggerDate.toLocaleString()}`);
-
-  try {
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "📚 Study Time!",
-        body: `Time to start: ${title}`,
-        sound: true, // Ensure sound is enabled for the notification itself
-        data: { voiceMessage: isVoiceOn ? voiceMessage : "" }
-      },
-      trigger: {
-        type: 'date',
-        date: triggerDate,
-      },
-    });
-    return id;
-  } catch (error) {
-    console.error("Notification scheduling error:", error);
-    return null;
-  }
-}, [allMessages]);
-
-  const loadAndSyncSessions = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      setCoins(await getCoinBalance());
-
-      let routineToLoad: Session[] = [];
-      const selectedTemplate = await AsyncStorage.getItem("selectedSessions");
-
-      if (selectedTemplate) {
-        routineToLoad = JSON.parse(selectedTemplate);
-        await AsyncStorage.setItem("studyRoutine", JSON.stringify(routineToLoad));
-        await AsyncStorage.removeItem("selectedSessions");
-      } else {
-        const stored = await AsyncStorage.getItem("studyRoutine");
-        routineToLoad = stored ? JSON.parse(stored) : [];
-      }
-
-      const historyStr = await AsyncStorage.getItem("completionHistory");
-      const history: HistoryRecord[] = historyStr ? JSON.parse(historyStr) : [];
-      const todayStr = new Date().toISOString().split("T")[0];
-      const completedTodayIds = new Set(history.filter(rec => rec.completedAt.startsWith(todayStr)).map(rec => rec.id));
-      const syncedSessions = routineToLoad.map(session => ({ ...session, completed: completedTodayIds.has(session.id) }));
-
-      setSessions(syncedSessions);
-      setIsLoading(false);
-
-      const scheduleAndSaveNotifications = async (sessionsToUpdate: Session[]) => {
-        const notificationsEnabled = await AsyncStorage.getItem("notificationsEnabled");
-        if (notificationsEnabled === "true") {
-          const sessionsWithNotifIds = [...sessionsToUpdate];
-          for (let i = 0; i < sessionsWithNotifIds.length; i++) {
-            const session = sessionsWithNotifIds[i];
-            const triggerDate = timeStringToDate(session.start);
-            const notificationId = await scheduleNotification(session.title, triggerDate);
-            if (notificationId) {
-                sessionsWithNotifIds[i].notificationId = notificationId;
-            }
-          }
-          await AsyncStorage.setItem("studyRoutine", JSON.stringify(sessionsWithNotifIds));
-        }
-      };
-      
-      scheduleAndSaveNotifications(syncedSessions);
-
-    } catch (err) { 
-      console.error("Error loading and syncing sessions:", err); 
-      setIsLoading(false); 
+    if (triggerDate.getTime() <= Date.now()) {
+      triggerDate.setDate(triggerDate.getDate() + 1);
     }
-  }, [scheduleNotification]);
+    
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "📚 Study Time!",
+          body: `Time to start: ${title}`,
+          sound: true,
+          data: { voiceMessage: isVoiceOn ? voiceMessage : "" }
+        },
+        trigger: { type: 'date', date: triggerDate },
+      });
+      console.log(`✅ Notification scheduled for "${title}" at ${triggerDate.toLocaleString()}`);
+      return id;
+    } catch (error) {
+      console.error("Notification scheduling error:", error);
+      return null;
+    }
+  }, [allMessages]);
+
+  const syncSessionStatus = useCallback(async () => {
+    try {
+        const historyStr = await AsyncStorage.getItem("completionHistory");
+        const history: HistoryRecord[] = historyStr ? JSON.parse(historyStr) : [];
+        const todayStr = new Date().toISOString().split("T")[0];
+        const completedTodayIds = new Set(history.filter(rec => rec.completedAt.startsWith(todayStr)).map(rec => rec.id));
+
+        setSessions(prevSessions => 
+            prevSessions.map(session => ({
+                ...session,
+                completed: completedTodayIds.has(session.id),
+            }))
+        );
+        setCoins(await getCoinBalance());
+    } catch (err) {
+        console.error("Error syncing session status:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const initialLoad = async () => {
+        setIsLoading(true);
+        try {
+            let routineToLoad: Session[] = [];
+            const selectedTemplate = await AsyncStorage.getItem("selectedSessions");
+
+            if (selectedTemplate) {
+                console.log("🔄 New template found, re-scheduling all notifications...");
+                await Notifications.cancelAllScheduledNotificationsAsync();
+                routineToLoad = JSON.parse(selectedTemplate);
+
+                const notificationsEnabled = await AsyncStorage.getItem("notificationsEnabled");
+                if (notificationsEnabled === "true") {
+                    for (let i = 0; i < routineToLoad.length; i++) {
+                        const session = routineToLoad[i];
+                        const triggerDate = timeStringToDate(session.start);
+                        const notificationId = await scheduleNotification(session.title, triggerDate);
+                        if (notificationId) {
+                            routineToLoad[i].notificationId = notificationId;
+                        }
+                    }
+                }
+                await AsyncStorage.setItem("studyRoutine", JSON.stringify(routineToLoad));
+                await AsyncStorage.removeItem("selectedSessions");
+            } else {
+                const stored = await AsyncStorage.getItem("studyRoutine");
+                routineToLoad = stored ? JSON.parse(stored) : [];
+            }
+            setSessions(routineToLoad);
+            await syncSessionStatus();
+        } catch (err) {
+            console.error("Error during initial load:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    initialLoad();
+  }, [scheduleNotification, syncSessionStatus]);
+
 
   const handleAddSession = useCallback(async () => {
     if (!newSessionTitle || !newSessionStartDate || !newSessionEndDate) return Alert.alert("Please fill all fields");
-    const newSession: Session = { id: Date.now().toString(), title: newSessionTitle, start: formatTime(newSessionStartDate), end: formatTime(newSessionEndDate) };
+    
+    const newSession: Session = { 
+        id: Date.now().toString(), 
+        title: newSessionTitle, 
+        start: formatTime(newSessionStartDate), 
+        end: formatTime(newSessionEndDate) 
+    };
+
+    const notificationsEnabled = await AsyncStorage.getItem("notificationsEnabled");
+    if (notificationsEnabled === "true") {
+        const triggerDate = timeStringToDate(newSession.start);
+        const notificationId = await scheduleNotification(newSession.title, triggerDate);
+        if (notificationId) {
+            newSession.notificationId = notificationId;
+        }
+    }
+
     const updatedSessions = [...sessions, newSession];
     await AsyncStorage.setItem("studyRoutine", JSON.stringify(updatedSessions));
+    setSessions(updatedSessions);
+    
     setCreateModalVisible(false);
     setNewSessionTitle("");
     setNewSessionStartDate(null);
     setNewSessionEndDate(null);
-    await loadAndSyncSessions();
-  }, [newSessionTitle, newSessionStartDate, newSessionEndDate, sessions, loadAndSyncSessions]);
+  }, [newSessionTitle, newSessionStartDate, newSessionEndDate, sessions, scheduleNotification]);
 
   const deleteSession = useCallback(async (id: string) => {
     const sessionToDelete = sessions.find((s) => s.id === id);
-    if (sessionToDelete?.notificationId) await Notifications.cancelScheduledNotificationAsync(sessionToDelete.notificationId);
+    if (sessionToDelete?.notificationId) {
+        console.log(`🗑️ Cancelling notification for "${sessionToDelete.title}"`);
+        await Notifications.cancelScheduledNotificationAsync(sessionToDelete.notificationId);
+    }
     const filtered = sessions.filter((s) => s.id !== id);
     await AsyncStorage.setItem("studyRoutine", JSON.stringify(filtered));
     setSessions(filtered);
@@ -182,39 +212,93 @@ export default function HomeScreen() {
   const toggleCompletion = useCallback(async (sessionToToggle: Session) => {
     const updatedSessions = sessions.map(s => s.id === sessionToToggle.id ? { ...s, completed: !s.completed } : s);
     setSessions(updatedSessions);
+
     const isNowCompleted = !sessionToToggle.completed;
     const historyStr = await AsyncStorage.getItem("completionHistory");
     let history: HistoryRecord[] = historyStr ? JSON.parse(historyStr) : [];
-    const currentCoins = await getCoinBalance();
-    const coinsForThisSession = Math.round(sessionDurationHours(sessionToToggle.start, sessionToToggle.end));
-    let newCoinBalance = currentCoins;
-    if (isNowCompleted) {
-      history.push({ ...sessionToToggle, completedAt: new Date().toISOString() });
-      newCoinBalance += coinsForThisSession;
-      checkAndNotifyForStreaks(sessionToToggle, history);
-    } else {
-      const todayStr = new Date().toISOString().split("T")[0];
-      history = history.filter(rec => !(rec.id === sessionToToggle.id && rec.completedAt.startsWith(todayStr)));
-      newCoinBalance = Math.max(0, currentCoins - coinsForThisSession);
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    const dailyCoinInfoStr = await AsyncStorage.getItem("dailyCoinInfo");
+    let dailyCoinInfo = dailyCoinInfoStr ? JSON.parse(dailyCoinInfoStr) : { date: todayStr, count: 0 };
+    if (dailyCoinInfo.date !== todayStr) {
+        dailyCoinInfo = { date: todayStr, count: 0 };
     }
+
+    const excludedTasks = ['sleep', 'ghum', 'rest', 'nap'];
+    const isExcluded = excludedTasks.some(keyword => sessionToToggle.title.toLowerCase().includes(keyword));
+
+    if (isNowCompleted) {
+        if (!isExcluded && dailyCoinInfo.count < 10) {
+            const coinsForThisSession = Math.round(sessionDurationHours(sessionToToggle.start, sessionToToggle.end));
+            const remainingCoinSlot = 10 - dailyCoinInfo.count;
+            const coinsToAward = Math.min(coinsForThisSession, remainingCoinSlot);
+
+            if (coinsToAward > 0) {
+                const currentCoins = await getCoinBalance();
+                const newCoinBalance = currentCoins + coinsToAward;
+                await saveCoinBalance(newCoinBalance);
+                setCoins(newCoinBalance);
+                dailyCoinInfo.count += coinsToAward;
+            }
+        }
+        history.push({ ...sessionToToggle, completedAt: new Date().toISOString() });
+        checkAndNotifyForStreaks(sessionToToggle, history);
+    } else {
+        const recordToUndo = history.find(rec => rec.id === sessionToToggle.id && rec.completedAt.startsWith(todayStr));
+        
+        if (recordToUndo && !isExcluded) {
+            const coinsForThisSession = Math.round(sessionDurationHours(recordToUndo.start, recordToUndo.end));
+            const awardedCoins = Math.min(coinsForThisSession, 10);
+            
+            if (awardedCoins > 0) {
+                const currentCoins = await getCoinBalance();
+                const newCoinBalance = Math.max(0, currentCoins - awardedCoins);
+                await saveCoinBalance(newCoinBalance);
+                setCoins(newCoinBalance);
+                dailyCoinInfo.count = Math.max(0, dailyCoinInfo.count - awardedCoins);
+                console.log(`🪙 ${awardedCoins} coin(s) deducted. Daily total: ${dailyCoinInfo.count}/10`);
+            }
+        }
+        history = history.filter(rec => rec.id !== sessionToToggle.id || !rec.completedAt.startsWith(todayStr));
+    }
+    
+    await AsyncStorage.setItem("dailyCoinInfo", JSON.stringify(dailyCoinInfo));
     await AsyncStorage.setItem("completionHistory", JSON.stringify(history));
-    await saveCoinBalance(newCoinBalance);
-    setCoins(newCoinBalance);
   }, [sessions]);
 
+
   const openEditModal = useCallback((session: Session) => {
-    setEditSession(session);
+    setEditSession({
+        ...session,
+        start: formatTime(timeStringToDate(session.start)),
+        end: formatTime(timeStringToDate(session.end)),
+    });
     setEditModalVisible(true);
   }, []);
 
   const saveEdit = useCallback(async () => {
     if (!editSession) return;
+
+    const oldSession = sessions.find(s => s.id === editSession.id);
+    if (oldSession?.notificationId) {
+        await Notifications.cancelScheduledNotificationAsync(oldSession.notificationId);
+    }
+
+    const notificationsEnabled = await AsyncStorage.getItem("notificationsEnabled");
+    if (notificationsEnabled === "true") {
+        const triggerDate = timeStringToDate(editSession.start);
+        const notificationId = await scheduleNotification(editSession.title, triggerDate);
+        if (notificationId) {
+            editSession.notificationId = notificationId;
+        }
+    }
+
     const updatedSessions = sessions.map(s => s.id === editSession.id ? editSession : s);
     await AsyncStorage.setItem("studyRoutine", JSON.stringify(updatedSessions));
+    setSessions(updatedSessions);
     setEditModalVisible(false);
     setEditSession(null);
-    await loadAndSyncSessions();
-  }, [sessions, editSession, loadAndSyncSessions]);
+  }, [sessions, editSession, scheduleNotification]);
 
   // --- Effects ---
   useEffect(() => {
@@ -234,25 +318,30 @@ export default function HomeScreen() {
       if (status === "granted") await Notifications.registerTaskAsync(VOICE_NOTIFICATION_TASK);
     }
     setupNotifications();
+
     const foregroundListener = Notifications.addNotificationReceivedListener(notification => {
         const voiceMessage = notification.request.content.data?.voiceMessage as string;
-        if (voiceMessage) Speech.speak(voiceMessage);
+        if (voiceMessage) {
+            setTimeout(() => {
+                Speech.speak(voiceMessage);
+            }, 1500);
+        }
     });
     return () => foregroundListener.remove();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadAndSyncSessions();
+      syncSessionStatus();
       const hour = new Date().getHours();
-      if (hour >= 4 && hour < 12) setHeadingText("Good Morning!");
-      else if (hour >= 12 && hour < 17) setHeadingText("Good Afternoon!");
-      else if (hour >= 17 && hour < 21) setHeadingText("Good Evening!");
-      else setHeadingText("Good Night!");
+      if (hour >= 4 && hour < 12) setHeadingText("Good Morning! ☀️");
+      else if (hour >= 12 && hour < 17) setHeadingText("Good Afternoon! 🌇");
+      else if (hour >= 17 && hour < 21) setHeadingText("Good Evening! 🌙");
+      else setHeadingText("Good Night! 😴");
       const timer = setTimeout(() => setHeadingText("My Daily Routine"), 5000);
       runDailyAIChecks();
       return () => clearTimeout(timer);
-    }, [loadAndSyncSessions])
+    }, [syncSessionStatus])
   );
 
   useEffect(() => {
@@ -308,7 +397,7 @@ export default function HomeScreen() {
   }
 
   return (
-   <LinearGradient colors={['#0e0f1bff', '#0e0f1bff']} style={styles.container}>
+    <LinearGradient colors={["#10101A", "#0A0A0A"]} style={styles.container}>
       <CustomTimePicker
         isVisible={isTimePickerVisible}
         onClose={() => setTimePickerVisible(false)}
@@ -323,14 +412,18 @@ export default function HomeScreen() {
       
       <View style={styles.headerContainer}>
         <Text style={styles.heading}>{headingText}</Text>
+        {/* ✅ onPress ইভেন্ট যোগ করা হয়েছে */}
+        <TouchableOpacity style={styles.coinContainer} onPress={() => setCoinInfoModalVisible(true)}>
+            <Text style={styles.coinIcon}>🪙</Text>
+            <Text style={styles.coinText}>{coins}</Text>
+        </TouchableOpacity>
       </View>
 
         {sessions.length > 0 && (
          <LinearGradient
-            colors={['#1c1f37ff', '#121121ff', '#2e2025ff']} // 🎨 বাম থেকে ডানে তিনটি নতুন কালার
-            locations={[0, 0.7, 1]}                    // কালারগুলোর অবস্থান
-            start={{ x: 0, y: 0 }}                     // বাম দিক থেকে শুরু
-            end={{ x: 1, y: 0 }}                       // ডান দিকে শেষ
+            colors={['#2A2A3A', '#1A1A2A']}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0, y: 0 }}
             style={styles.statusContainer}
         >
            <View style={styles.statusRow}>
@@ -437,6 +530,32 @@ export default function HomeScreen() {
         </LinearGradient>
       </Modal>
 
+      {/* ✅ নতুন Coin Info Modal */}
+      <Modal
+        visible={isCoinInfoModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCoinInfoModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.infoModalContainer}>
+            <Text style={styles.infoModalTitle}>What are Coins? 🪙</Text>
+            <Text style={styles.infoModalText}>
+              This is your self-reward. Each coin is worth 10 Taka.
+            </Text>
+            <Text style={styles.infoModalText}>
+              Take the money from yourself for the coins you earn, and enjoy a treat!
+            </Text>
+            <TouchableOpacity
+              style={styles.infoModalButton}
+              onPress={() => setCoinInfoModalVisible(false)}
+            >
+              <Text style={styles.infoModalButtonText}>Got It!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </LinearGradient>
   );
 }
@@ -445,8 +564,37 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, paddingHorizontal: 15, backgroundColor: '#000' },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    headerContainer: { marginTop: Platform.OS === "android" ? 50 : 70, marginBottom: 25, paddingHorizontal: 5 },
-    heading: { fontSize: 32, fontWeight: "bold", color: "#FFFFFF", minHeight: 40 },
+    headerContainer: { 
+        marginTop: Platform.OS === "android" ? 50 : 70, 
+        marginBottom: 25, 
+        paddingHorizontal: 5,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    heading: { 
+        fontSize: 32, 
+        fontWeight: "bold", 
+        color: "#FFFFFF", 
+        minHeight: 40 
+    },
+    coinContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    coinIcon: {
+        fontSize: 16,
+        marginRight: 6,
+    },
+    coinText: {
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
     statusContainer: { 
         marginBottom: 20, 
         padding: 14, 
@@ -476,5 +624,44 @@ const styles = StyleSheet.create({
     timeInput:{flexDirection:'row',alignItems:'center',backgroundColor:'#333',borderRadius:12,paddingVertical:15,width:'48%'},
     modalMainActionBtn:{backgroundColor:"#007AFF",paddingVertical:15,borderRadius:14,alignItems:"center",marginTop:10},
     modalMainActionBtnText:{color:"#fff",fontWeight:"bold",fontSize:17},
-    disabledBtn:{backgroundColor:'#3A3A3C'}
+    disabledBtn:{backgroundColor:'#3A3A3C'},
+    // ✅ নতুন Coin Info Modal-এর জন্য স্টাইল
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoModalContainer: {
+        width: '85%',
+        backgroundColor: '#2C2C2E',
+        borderRadius: 14,
+        padding: 20,
+        alignItems: 'center',
+    },
+    infoModalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#FFFFFF',
+        marginBottom: 15,
+    },
+    infoModalText: {
+        fontSize: 16,
+        color: '#E5E5EA',
+        textAlign: 'center',
+        marginBottom: 10,
+        lineHeight: 22,
+    },
+    infoModalButton: {
+        backgroundColor: '#007AFF',
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        marginTop: 15,
+    },
+    infoModalButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
 });

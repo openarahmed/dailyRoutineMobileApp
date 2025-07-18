@@ -18,16 +18,45 @@ type SessionItemProps = {
   onDelete: (id: string) => void; 
 };
 
-// Helper function to get an icon for each task
+// ✅✅✅ উন্নত এবং বিস্তৃত getIconForTask ফাংশন ✅✅✅
 const getIconForTask = (title: string) => {
-    const lowerCaseTitle = title.toLowerCase();
-    if (lowerCaseTitle.includes("exercise") || lowerCaseTitle.includes("gym")) return "fitness-center";
-    if (lowerCaseTitle.includes("study") || lowerCaseTitle.includes("math") || lowerCaseTitle.includes("science")) return "book";
-    if (lowerCaseTitle.includes("breakfast") || lowerCaseTitle.includes("lunch") || lowerCaseTitle.includes("dinner")) return "restaurant";
-    if (lowerCaseTitle.includes("break")) return "free-breakfast";
-    if (lowerCaseTitle.includes("read")) return "menu-book";
+    const lower = title.toLowerCase();
+
+    // Specific Activities (বেশি নির্দিষ্ট কাজগুলো আগে চেক করা হচ্ছে)
+    if (lower.includes("code review")) return "rate-review";
+    if (lower.includes("stand-up") || lower.includes("meeting")) return "people";
+    if (lower.includes("yoga") || lower.includes("meditation")) return "self-improvement";
+    if (lower.includes("prayer") || lower.includes("namaz")) return "spa";
+    if (lower.includes("cardio") || lower.includes("running") || lower.includes("walk")) return "directions-run";
+    if (lower.includes("strength training") || lower.includes("gym") || lower.includes("exercise") || lower.includes("workout")) return "fitness-center";
+    if (lower.includes("script writing") || lower.includes("journaling") || lower.includes("writer")) return "edit";
+    if (lower.includes("recording") || lower.includes("videos") || lower.includes("content creator")) return "videocam";
+    if (lower.includes("painting") || lower.includes("sketching") || lower.includes("artist")) return "palette";
+    if (lower.includes("shopping") || lower.includes("grocery") || lower.includes("market")) return "shopping-cart";
+    if (lower.includes("email") || lower.includes("communication") || lower.includes("calls") || lower.includes("client")) return "email";
+    if (lower.includes("social media") || lower.includes("engagement")) return "share";
+    if (lower.includes("analytics") || lower.includes("report")) return "analytics";
+    if (lower.includes("plan") || lower.includes("strategy") || lower.includes("scheduling")) return "event-note";
+    
+    // General Categories (সাধারণ কাজ)
+    if (lower.includes("code") || lower.includes("develop") || lower.includes("coding") || lower.includes("debug")) return "code";
+    if (lower.includes("study") || lower.includes("homework") || lower.includes("revision") || lower.includes("lectures") || lower.includes("student")) return "school";
+    if (lower.includes("read") || lower.includes("book") || lower.includes("literature")) return "menu-book";
+    if (lower.includes("work") || lower.includes("office") || lower.includes("project")) return "work";
+    if (lower.includes("breakfast") || lower.includes("lunch") || lower.includes("dinner")) return "restaurant";
+    if (lower.includes("break") || lower.includes("relax") || lower.includes("leisure")) return "free-breakfast";
+    if (lower.includes("sleep") || lower.includes("nap")) return "hotel";
+    if (lower.includes("clean")) return "cleaning-services";
+    if (lower.includes("commute") || lower.includes("travel")) return "commute";
+    if (lower.includes("family")) return "family-restroom";
+    if (lower.includes("health") || lower.includes("doctor") || lower.includes("therapy")) return "medical-services";
+    if (lower.includes("wake up") || lower.includes("prepare")) return "wb-sunny";
+    if (lower.includes("hobby") || lower.includes("personal")) return "star";
+
+    // Default Icon (যদি কোনো কিছুই না মেলে)
     return "list-alt";
 };
+
 
 // The SessionItem Component
 const SessionItem = React.memo(({ item, onToggle, onEdit, onDelete }: SessionItemProps) => {
@@ -91,10 +120,9 @@ const styles = StyleSheet.create({
         padding: 12,
         marginBottom: 12,
         borderRadius: 18,
-        // ✅ আপনার পরামর্শ অনুযায়ী, শ্যাডো সরিয়ে একটি ডার্ক ট্রান্সপারেন্ট ব্যাকগ্রাউন্ড ব্যবহার করা হয়েছে
-        backgroundColor: 'rgba(0, 0, 0, 0.1)', // কালো রঙের হালকা অপাসিটি
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
         borderWidth: 2,
-        borderColor: 'rgba(154, 152, 152, 0.06)', // একটি হালকা বর্ডার
+        borderColor: 'rgba(154, 152, 152, 0.06)',
     },
     sessionItemCompleted:{
         backgroundColor:'rgba(0, 122, 255, 0.2)', 

@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "bold",
     color: "#fff",
-    marginTop: 35,
+    marginTop: 3,
     marginBottom: 20,
   },
   listContainer: {
