@@ -7,7 +7,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import { Alert, Linking, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -96,7 +96,7 @@ export default function RootLayout() {
         </Stack>
 
         {/* Global Footer */}
-        <Text style={styles.footerText}>Made with ❤️ by Shakil Ahmed</Text>
+        {/* <Text style={styles.footerText}>Made with ❤️ by Shakil Ahmed</Text> */}
       </View>
 
       <StatusBar style="auto" />

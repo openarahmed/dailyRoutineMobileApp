@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { routineTemplates } from "../../lib/templateData"; // path to templates
+import { routineTemplates } from "../lib/templateData"; // path to templates
 
 export default function TemplateTab() {
   const router = useRouter();
