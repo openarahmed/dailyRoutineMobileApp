@@ -397,7 +397,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <LinearGradient colors={["#10101A", "#0A0A0A"]} style={styles.container}>
+    <LinearGradient colors={["#0a0a15ff", "#0a0a15ff"]} style={styles.container}>
       <CustomTimePicker
         isVisible={isTimePickerVisible}
         onClose={() => setTimePickerVisible(false)}
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     },
     infoModalContainer: {
         width: '85%',
-        backgroundColor: '#2C2C2E',
+        backgroundColor: '#0b111d',
         borderRadius: 14,
         padding: 20,
         alignItems: 'center',

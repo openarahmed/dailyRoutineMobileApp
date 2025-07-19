@@ -212,7 +212,7 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#0b111d",
     paddingHorizontal: 12,
   },
   heading: {

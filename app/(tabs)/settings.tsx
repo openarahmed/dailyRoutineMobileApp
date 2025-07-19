@@ -1,13 +1,18 @@
+// app/(tabs)/settings.tsx
+
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import * as Notifications from "expo-notifications";
+import { Link } from "expo-router";
 import * as Speech from "expo-speech";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
   Button,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -119,8 +124,19 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.heading}>Settings</Text>
+
+      {/* ✅ Eye Protector অপশনটি এখানে যোগ করা হয়েছে */}
+      <Link href="/eye-protector" asChild>
+        <TouchableOpacity style={styles.settingRow}>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Ionicons name="eye-outline" size={22} color="#007AFF" style={{marginRight: 15}}/>
+                <Text style={styles.text}>Eye Protector</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color="#8A8A8E" />
+        </TouchableOpacity>
+      </Link>
 
       <View style={styles.settingRow}>
         <Text style={styles.text}>Enable Notifications</Text>
@@ -165,7 +181,7 @@ export default function SettingsScreen() {
           color="#007bff"
         />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -173,20 +189,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 12,
-    backgroundColor: "#000000",
+    backgroundColor: "#0b111d",
   },
   heading: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#fff",
-    marginTop: 35,
+    marginTop: 60,
     marginBottom: 20,
+    paddingHorizontal: 5,
   },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#1e1e1e",
+    backgroundColor: "#1e1e1e52",
     padding: 15,
     borderRadius: 10,
     marginBottom: 12,

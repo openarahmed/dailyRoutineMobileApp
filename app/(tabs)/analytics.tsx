@@ -1,10 +1,10 @@
+import { Ionicons } from "@expo/vector-icons"; // Using Ionicons for consistency
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 import { AbstractChartConfig } from "react-native-chart-kit/dist/AbstractChart";
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 // Define a specific type for our chart data for better type safety
 type ChartData = {
@@ -126,7 +126,6 @@ export default function AnalyticsScreen() {
           allCompletedSessions.forEach((session) => {
             if (session.completedAt) {
               const dateStr = getDatePart(session.completedAt);
-              // ✅ FIX: Changed 's.end' to 'session.end' to fix the reference error
               const hours = sessionDurationHours(session.start, session.end);
               const currentHours = productiveHoursByDate.get(dateStr) || 0;
               productiveHoursByDate.set(dateStr, currentHours + hours);
@@ -171,11 +170,11 @@ export default function AnalyticsScreen() {
   const last7Days = getLast7Days();
 
   const chartConfig: AbstractChartConfig = {
-    backgroundColor: "#1f1f1f",
-    backgroundGradientFrom: "#1f1f1f",
-    backgroundGradientTo: "#1f1f1f",
+    backgroundColor: "#18202e",
+    backgroundGradientFrom: "#18202e",
+    backgroundGradientTo: "#18202e",
     decimalPlaces: 1,
-    color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`,
+    color: (opacity = 1) => `rgba(65, 136, 255, ${opacity})`, // Blue color from focus screen
     labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
     style: {
       borderRadius: 16,
@@ -183,7 +182,7 @@ export default function AnalyticsScreen() {
     propsForDots: {
       r: "6",
       strokeWidth: "2",
-      stroke: "#ffa726",
+      stroke: "#7ceffd", // Cyan color from focus screen
     },
   };
 
@@ -196,25 +195,17 @@ export default function AnalyticsScreen() {
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <MaterialIcons
-            name="check-circle-outline"
-            size={28}
-            color="#4caf50"
-          />
+          <Ionicons name="checkmark-done-circle-outline" size={28} color="#4caf50" />
           <Text style={styles.statValue}>{completedCount}</Text>
           <Text style={styles.statLabel}>Sessions</Text>
         </View>
         <View style={styles.statItem}>
-          <MaterialIcons name="hourglass-top" size={28} color="#ff9800" />
+          <Ionicons name="hourglass-outline" size={28} color="#ff9800" />
           <Text style={styles.statValue}>{productiveHours}</Text>
           <Text style={styles.statLabel}>Hours</Text>
         </View>
         <View style={styles.statItem}>
-          <MaterialIcons
-            name="local-fire-department"
-            size={28}
-            color="#f44336"
-          />
+          <Ionicons name="flame-outline" size={28} color="#f44336" />
           <Text style={styles.statValue}>{streak}</Text>
           <Text style={styles.statLabel}>Day Streak</Text>
         </View>
@@ -233,9 +224,11 @@ export default function AnalyticsScreen() {
                   : styles.progressMissed,
               ]}
             >
-              <Text style={styles.progressIcon}>
-                {dailyProgress[date] ? "✅" : "✘"}
-              </Text>
+              {dailyProgress[date] ? (
+                <Ionicons name="checkmark-sharp" size={22} color="#fff" />
+              ) : (
+                <Ionicons name="close-sharp" size={22} color="#fff" />
+              )}
             </View>
           </View>
         ))}
@@ -271,7 +264,7 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#0b111d", // Updated background color
     paddingHorizontal: 12,
   },
   heading: {
@@ -284,11 +277,10 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: "#1f1f1f",
+    backgroundColor: "#18202e", // Updated card color
     borderRadius: 16,
     paddingVertical: 15,
     marginBottom: 30,
-    elevation: 5,
   },
   statItem: {
     alignItems: "center",
@@ -317,11 +309,10 @@ const styles = StyleSheet.create({
   progressContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: "#1f1f1f",
+    backgroundColor: "#18202e", // Updated card color
     paddingVertical: 18,
     paddingHorizontal: 10,
     borderRadius: 16,
-    elevation: 5,
     marginBottom: 20,
   },
   progressItem: {
@@ -330,30 +321,25 @@ const styles = StyleSheet.create({
   },
   progressDay: {
     color: "#b0b0b0",
-    marginBottom: 6,
+    marginBottom: 8,
     fontWeight: "700",
     fontSize: 12,
   },
   progressCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
   },
   progressDone: {
-    backgroundColor: "#4caf50",
+    backgroundColor: "rgba(76, 175, 80, 0.7)", // Green with transparency
   },
   progressMissed: {
-    backgroundColor: "#8b0000",
-  },
-  progressIcon: {
-    fontSize: 18,
-    color: "#fff",
-    fontWeight: "bold",
+    backgroundColor: "rgba(255, 0, 0, 0.5)", // Red with transparency
   },
   chartContainer: {
-    backgroundColor: "#1f1f1f",
+    backgroundColor: "#18202e", // Updated card color
     borderRadius: 16,
     paddingTop: 10,
     paddingBottom: 5,

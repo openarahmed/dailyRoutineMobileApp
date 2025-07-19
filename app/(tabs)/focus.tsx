@@ -1,59 +1,62 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Notifications from "expo-notifications";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Animated,
-  Easing,
   Keyboard,
   Platform,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import Svg, { Circle } from "react-native-svg";
 
-// --- Animated SVG Circle for Progress ---
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// --- Constants ---
-const SIZE = 280;
-const STROKE_WIDTH = 15;
-const RADIUS = (SIZE - STROKE_WIDTH) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-
-// --- Premium Focus Screen Component ---
+// --- Main Focus Screen Component ---
 const FocusScreen = () => {
   const [mode, setMode] = useState<"timer" | "stopwatch">("timer");
 
   // Timer States
   const [timerSeconds, setTimerSeconds] = useState(25 * 60);
-  const [totalTimerSeconds, setTotalTimerSeconds] = useState(25 * 60);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [timerInputMinutes, setTimerInputMinutes] = useState("25");
 
   // Stopwatch States
-  const [stopwatchTime, setStopwatchTime] = useState(0);
+  const [stopwatchTime, setStopwatchTime] = useState(0); // Time in milliseconds
   const [isStopwatchActive, setIsStopwatchActive] = useState(false);
 
-  // Animation
-  const animatedProgress = useRef(new Animated.Value(1)).current;
+  // Feature States
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  
+  // --- Notification Logic ---
+  useEffect(() => {
+    const requestPermissions = async () => {
+      if (Platform.OS !== 'web') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission required', 'Please grant notification permissions to receive alerts.');
+        }
+      }
+    };
+    requestPermissions();
+  }, []);
 
-  // Notification for timer completion
   const triggerTimerEndNotification = async () => {
+    if (!notificationsEnabled) return;
+
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "Focus Timer",
-        body: "Time's up! Great work!",
+        title: "FOCUS",
+        body: "Time's up! Great work staying focused.",
         sound: true,
       },
       trigger: null,
     });
   };
 
-  // Timer Countdown Logic
+  // --- Timer & Stopwatch Logic ---
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isTimerActive && timerSeconds > 0) {
@@ -70,284 +73,250 @@ const FocusScreen = () => {
     };
   }, [isTimerActive, timerSeconds]);
 
-  // Stopwatch Logic
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isStopwatchActive) {
       interval = setInterval(() => {
-        setStopwatchTime((prev) => prev + 10);
-      }, 10);
+        setStopwatchTime((prev) => prev + 10); // Increment by 10ms
+      }, 10); // Run every 10ms
     }
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [isStopwatchActive]);
 
-  // Animation for Timer Progress
-  useEffect(() => {
-    const progress =
-      totalTimerSeconds > 0 ? timerSeconds / totalTimerSeconds : 1;
-    Animated.timing(animatedProgress, {
-      toValue: progress,
-      duration: 300,
-      useNativeDriver: true,
-      easing: Easing.out(Easing.ease),
-    }).start();
-  }, [timerSeconds, totalTimerSeconds]);
-
   // --- Handlers ---
-  const handleStartTimer = () => {
-    const minutes = parseInt(timerInputMinutes, 10);
-    if (isNaN(minutes) || minutes <= 0) {
-      Alert.alert("Invalid Input", "Please enter a valid number of minutes.");
-      return;
+  const handleToggleStartPause = () => {
+    if (mode === 'timer') {
+      // If timer is at 0 and inactive, first set the time from input
+      if (!isTimerActive && timerSeconds === 0) {
+        const minutes = parseInt(timerInputMinutes, 10);
+        if (isNaN(minutes) || minutes <= 0) {
+          Alert.alert("Invalid Input", "Please enter a valid number of minutes.");
+          return;
+        }
+        setTimerSeconds(minutes * 60);
+      }
+      setIsTimerActive(!isTimerActive);
+      Keyboard.dismiss();
+    } else {
+      setIsStopwatchActive(!isStopwatchActive);
     }
-    const totalSeconds = minutes * 60;
-    setTotalTimerSeconds(totalSeconds);
-    setTimerSeconds(totalSeconds);
-    setIsTimerActive(true);
-    animatedProgress.setValue(1);
-    Keyboard.dismiss();
   };
 
-  const handlePauseTimer = () => setIsTimerActive(false);
-  const handleResetTimer = () => {
-    setIsTimerActive(false);
-    setTimerInputMinutes("25");
-    const newTotalSeconds = 25 * 60;
-    setTotalTimerSeconds(newTotalSeconds);
-    setTimerSeconds(newTotalSeconds);
-    animatedProgress.setValue(1);
-  };
-
-  const handleStartStopwatch = () => setIsStopwatchActive(true);
-  const handlePauseStopwatch = () => setIsStopwatchActive(false);
-  const handleResetStopwatch = () => {
-    setIsStopwatchActive(false);
-    setStopwatchTime(0);
+  const handleReset = () => {
+    if (mode === 'timer') {
+      setIsTimerActive(false);
+      const minutes = parseInt(timerInputMinutes, 10) || 25;
+      setTimerSeconds(minutes * 60);
+    } else {
+      setIsStopwatchActive(false);
+      setStopwatchTime(0);
+    }
   };
 
   // --- Formatting ---
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const secs = (seconds % 60).toString().padStart(2, "0");
-    return `${mins}:${secs}`;
+  const formatTime = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, "0");
+    const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0");
+    const secs = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${hours}:${mins}:${secs}`;
   };
 
-  const formatStopwatchTime = (time: number) => {
-    const minutes = Math.floor(time / 60000)
-      .toString()
-      .padStart(2, "0");
-    const seconds = (Math.floor(time / 1000) % 60).toString().padStart(2, "0");
-    const milliseconds = (Math.floor(time / 10) % 100)
-      .toString()
-      .padStart(2, "0");
-    return { minutes, seconds, milliseconds };
+  const formatStopwatchTime = (timeInMillis: number) => {
+    const totalSeconds = Math.floor(timeInMillis / 1000);
+    const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, "0");
+    const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0");
+    const secs = (totalSeconds % 60).toString().padStart(2, "0");
+    const milliseconds = (Math.floor(timeInMillis / 10) % 100).toString().padStart(2, '0');
+    return { hours, mins, secs, milliseconds };
   };
 
-  const progressAnimation = animatedProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, CIRCUMFERENCE],
-  });
+  // --- Render Functions ---
+  const renderTimer = () => (
+    <>
+      <Text style={styles.timeDisplay}>{formatTime(timerSeconds)}</Text>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          value={timerInputMinutes}
+          onChangeText={setTimerInputMinutes}
+          keyboardType="numeric"
+          editable={!isTimerActive}
+          placeholder="25"
+          placeholderTextColor="#555"
+        />
+        <Text style={styles.inputLabel}>minutes</Text>
+      </View>
+    </>
+  );
+
+  const renderStopwatch = () => {
+    const { hours, mins, secs, milliseconds } = formatStopwatchTime(stopwatchTime);
+    return (
+      <>
+        <View style={styles.stopwatchDisplayContainer}>
+          <Text style={styles.timeDisplay}>{`${hours}:${mins}:${secs}`}</Text>
+          <Text style={styles.milliSecondDisplay}>.{milliseconds}</Text>
+        </View>
+        <View style={styles.inputContainer} />
+      </>
+    );
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Focus Zone</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.mainContent}>
+        <Text style={styles.heading}>FOCUS</Text>
 
-      <View style={styles.switcherContainer}>
-        {["timer", "stopwatch"].map((m) => (
-          <TouchableOpacity
-            key={m}
-            onPress={() => setMode(m as "timer" | "stopwatch")}
-            style={[
-              styles.switcherButton,
-              mode === m && styles.switcherActiveButton,
-            ]}
-          >
-            <Text
+        <View style={styles.switcherContainer}>
+          {["Timer", "Stopwatch"].map((m) => (
+            <TouchableOpacity
+              key={m}
+              onPress={() => setMode(m.toLowerCase() as "timer" | "stopwatch")}
               style={[
-                styles.switcherText,
-                mode === m && styles.switcherActiveText,
+                styles.switcherButton,
+                mode === m.toLowerCase() && styles.switcherActiveButton,
               ]}
             >
-              {m.charAt(0).toUpperCase() + m.slice(1)}
-            </Text>
+              <Text style={[
+                  styles.switcherText,
+                  mode === m.toLowerCase() && styles.switcherActiveText,
+                ]}
+              >
+                {m}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.contentContainer}>
+          {mode === "timer" ? renderTimer() : renderStopwatch()}
+        </View>
+
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={styles.startButton} onPress={handleToggleStartPause}>
+            <LinearGradient
+              colors={["#4188ff", "#345cef"]}
+              style={styles.gradient}
+            >
+              <Text style={styles.buttonText}>
+                {isTimerActive || isStopwatchActive ? "Pause" : "Start"}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.contentContainer}>
-        {mode === "timer" && (
-          <>
-            <View style={styles.timerCircle}>
-              <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-                <Circle
-                  cx={SIZE / 2}
-                  cy={SIZE / 2}
-                  r={RADIUS}
-                  stroke="#2D2D2D"
-                  strokeWidth={STROKE_WIDTH}
-                />
-                <AnimatedCircle
-                  cx={SIZE / 2}
-                  cy={SIZE / 2}
-                  r={RADIUS}
-                  stroke="#007BFF"
-                  strokeWidth={STROKE_WIDTH}
-                  strokeDasharray={CIRCUMFERENCE}
-                  strokeDashoffset={progressAnimation}
-                  strokeLinecap="round"
-                  transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
-                />
-              </Svg>
-              <View style={styles.timeDisplayContainer}>
-                <Text style={styles.timeDisplay}>
-                  {formatTime(timerSeconds)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                value={timerInputMinutes}
-                onChangeText={setTimerInputMinutes}
-                keyboardType="numeric"
-                editable={!isTimerActive}
-              />
-              <Text style={styles.inputLabel}>minutes</Text>
-            </View>
-          </>
-        )}
-
-        {mode === "stopwatch" && (
-          <View style={styles.timerCircle}>
-            <View style={styles.timeDisplayContainer}>
-              <Text style={styles.timeDisplay}>
-                {formatStopwatchTime(stopwatchTime).minutes}:
-                {formatStopwatchTime(stopwatchTime).seconds}
-              </Text>
-              <Text style={styles.milliSecondDisplay}>
-                .{formatStopwatchTime(stopwatchTime).milliseconds}
-              </Text>
-            </View>
+          <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
+            <Ionicons name="refresh" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Feature Cards */}
+        <View style={styles.combinedCard}>
+          {/* Notification Row */}
+          <View style={styles.cardRow}>
+            <Ionicons name="notifications-outline" size={24} color="#fff" />
+            <Text style={styles.cardText}>Notification:</Text>
+            <TouchableOpacity onPress={() => setNotificationsEnabled(!notificationsEnabled)}>
+                <Text style={styles.cardValueText}>{notificationsEnabled ? "On" : "Off"}</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      </View>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={styles.buttonSecondary}
-          onPress={mode === "timer" ? handleResetTimer : handleResetStopwatch}
-        >
-          <Ionicons name="refresh" size={32} color="#EFEFEF" />
-        </TouchableOpacity>
+          {/* Sound Row */}
+          <View style={[styles.cardRow, { paddingTop: 0 }]}>
+            <Ionicons name="musical-notes-outline" size={24} color="#fff" />
+            <Text style={styles.cardText}>Ambient Sound</Text>
+            <TouchableOpacity onPress={() => Alert.alert("Feature unavailable", "This feature requires a new build.")}>
+                 <Text style={styles.cardValueText}>Rain</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <TouchableOpacity
-          style={styles.buttonPrimary}
-          onPress={
-            mode === "timer"
-              ? isTimerActive
-                ? handlePauseTimer
-                : handleStartTimer
-              : isStopwatchActive
-              ? handlePauseStopwatch
-              : handleStartStopwatch
-          }
-        >
-          <Ionicons
-            name={isTimerActive || isStopwatchActive ? "pause" : "play"}
-            size={40}
-            color="#121212"
-          />
-        </TouchableOpacity>
+        <Text style={styles.tipText}>Tip: Stay away from your phone!</Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
+// --- Styles ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    backgroundColor: "#0b111d",
+paddingTop:20  },
+  mainContent: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 25,
+    paddingTop: Platform.OS === 'android' ? 40 : 20,
   },
-  // ✅ FIX: Updated heading style as requested
   heading: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 34,
+    fontWeight: '600',
     color: "#fff",
-    marginTop: 45,
-    marginBottom: 20,
-    textAlign: "left",
+    letterSpacing: 2,
+    marginBottom: 30,
+    textAlign: "center",
   },
   switcherContainer: {
     flexDirection: "row",
-    backgroundColor: "#1E1E1E",
-    borderRadius: 30,
+    backgroundColor: "#18202e",
+    borderRadius: 25,
     padding: 5,
-    alignSelf: "center",
-    marginBottom: 20,
+    marginBottom: 30,
   },
   switcherButton: {
     paddingVertical: 10,
-    paddingHorizontal: 25,
-    borderRadius: 25,
+    paddingHorizontal: 28,
+    borderRadius: 20,
   },
   switcherActiveButton: {
-    backgroundColor: "#007BFF",
+    backgroundColor: "#3339426c",
   },
   switcherText: {
-    color: "#999",
-    fontSize: 16,
+    color: "#9e9e9e86",
+    fontSize: 15,
     fontWeight: "600",
   },
   switcherActiveText: {
     color: "#FFFFFF",
   },
   contentContainer: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    width: "100%",
-  },
-  timerCircle: {
-    width: SIZE,
-    height: SIZE,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  timeDisplayContainer: {
-    position: "absolute",
-    justifyContent: "center",
-    alignItems: "baseline",
-    flexDirection: "row",
+    marginBottom: 30,
+    height: 150,
   },
   timeDisplay: {
-    fontSize: 72,
-    fontWeight: "200",
-    color: "#EFEFEF",
+    fontSize: 74,
+    fontWeight: "600",
+    color: "#7ceffd",
+    marginTop:40,
     fontFamily: Platform.OS === "ios" ? "Helvetica Neue" : "sans-serif-light",
   },
+  stopwatchDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 20,
+  },
   milliSecondDisplay: {
-    fontSize: 24,
-    color: "#888",
-    fontWeight: "200",
+    fontSize: 32,
+    fontWeight: '200',
+    color: '#7ceffd',
+    fontFamily: Platform.OS === "ios" ? "Helvetica Neue" : "sans-serif-light",
     marginLeft: 2,
-    lineHeight: 72,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 50,
+    justifyContent: 'center',
+    height: 70,
+        
+
   },
   input: {
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#18202e",
     color: "#fff",
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "600",
     textAlign: "center",
     padding: 15,
     width: 80,
@@ -360,31 +329,65 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
     width: "100%",
-    paddingBottom: 20,
+    marginBottom: 15,
+    marginTop: 70, // Added margin top
   },
-  buttonPrimary: {
-    backgroundColor: "#007BFF",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  startButton: {
+    flex: 3, // Increased flex to make it larger
+    marginRight: 15,
+  },
+  gradient: {
     justifyContent: "center",
     alignItems: "center",
-    elevation: 10,
-    shadowColor: "#007BFF",
-    shadowRadius: 15,
-    shadowOpacity: 0.3,
+    paddingVertical: 22, // Increased height
+    borderRadius: 12,
+    height:75,
   },
-  buttonSecondary: {
-    backgroundColor: "#2D2D2D",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+  resetButton: {
+    flex: 1,
+    backgroundColor: "#18202e",
     justifyContent: "center",
     alignItems: "center",
+    paddingVertical: 22, // Increased height
+    borderRadius: 12,
   },
+  buttonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  combinedCard: {
+    backgroundColor: '#18202e',
+    borderRadius: 12,
+    width: '100%',
+    marginBottom: 15,
+    paddingVertical: 18, // Add some vertical padding to the card itself
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15, // Adjusted padding
+    paddingHorizontal: 20,
+  },
+  cardText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    marginLeft: 15,
+  },
+  cardValueText: {
+    color: '#A0A0A0',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  tipText: {
+    color: '#666',
+    fontSize: 14,
+    marginTop: 5,
+    fontWeight: '500',
+  }
 });
 
 export default FocusScreen;
