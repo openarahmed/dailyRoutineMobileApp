@@ -1,18 +1,20 @@
-// components/TimeBlockCard.js
-
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+// @ts-ignore
 import { cardColors } from '../constants/cardColors';
-import SessionItem from './SessionItem';
+import SessionItem, { Session } from './SessionItem'; // SessionItem থেকে Session টাইপ ইম্পোর্ট করা হচ্ছে
 
-// Type Definitions (no change)
-type Session = { id: string; title: string; start: string; end:string; completed?: boolean; };
+// Type Definitions
 type Section = { title: string; iconName: string; data: Session[]; };
-type TimeBlockCardProps = { section: Section; onToggle: (item: Session) => void; onEdit: (item: Session) => void; onDelete: (id: string) => void; };
+type TimeBlockCardProps = { 
+    section: Section; 
+    onToggle: (item: Session) => Promise<void>; // ✅ টাইপটি আপডেট করা হয়েছে
+    onEdit: (item: Session) => void; 
+    onDelete: (id: string) => void; 
+};
 
-// প্রতিটি টাইম ব্লকের আইকনের জন্য কালার অবজেক্ট
 const timeBlockIconColors: { [key: string]: string } = {
   Morning: '#f1932b',
   Midday: '#1e61ef',
@@ -27,13 +29,11 @@ const TimeBlockCard = ({ section, onToggle, onEdit, onDelete }: TimeBlockCardPro
   return (
     <View style={styles.cardContainer}>
       
-      {/* লেয়ার ১: বেস গ্রেডিয়েন্ট (নিচের অংশ) */}
       <LinearGradient
         colors={colors.bottom as [string, string]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* লেয়ার ২: টপ-লেফট কর্নারের আভা */}
       <LinearGradient
         colors={[colors.topLeft, 'transparent']}
         start={{ x: 0, y: 0 }}
@@ -41,7 +41,6 @@ const TimeBlockCard = ({ section, onToggle, onEdit, onDelete }: TimeBlockCardPro
         style={styles.cornerGradient}
       />
 
-      {/* লেয়ার ৩: টপ-রাইট কর্নারের আভা */}
       <LinearGradient
         colors={[colors.topRight, 'transparent']}
         start={{ x: 1, y: 0 }}
@@ -49,7 +48,6 @@ const TimeBlockCard = ({ section, onToggle, onEdit, onDelete }: TimeBlockCardPro
         style={styles.cornerGradient}
       />
       
-      {/* লেয়ার ৪: মূল কন্টেন্ট */}
       <View style={styles.contentContainer}>
         <View style={styles.timeBlockHeader}>
           <MaterialIcons name={section.iconName as any} size={22} color={iconColor} />
@@ -66,12 +64,12 @@ const TimeBlockCard = ({ section, onToggle, onEdit, onDelete }: TimeBlockCardPro
 
 const styles = StyleSheet.create({
   cardContainer: {
-    borderRadius: 24,
-    marginBottom: 20,
+    borderRadius: 20,
+    marginBottom: 12,
     overflow: 'hidden',
     position: 'relative',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(89, 80, 137, 0.45)',
   },
   cornerGradient: {
     position: 'absolute',
@@ -79,22 +77,24 @@ const styles = StyleSheet.create({
     top: 0,
     width: '100%',
     height: '100%',
-    opacity: 0.3, 
+    opacity: 0.5, 
   },
   contentContainer: {
-    padding: 15,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 2,
     backgroundColor: 'transparent',
   },
   timeBlockHeader:{
     flexDirection:'row',
     alignItems:'center',
-    marginBottom:15
+    marginBottom:10
   },
   timeBlockTitle:{
     color:'#FFFFFF',
     fontSize:20,
     fontWeight:'bold',
-    marginLeft:12
+    marginLeft:10
   },
 });
 

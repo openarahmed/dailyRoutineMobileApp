@@ -1,64 +1,107 @@
 // app/_layout.tsx
 
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
+import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
-import { View } from "react-native";
+import { Alert, Platform, View } from "react-native";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { registerEyeProtectorTask } from '../services/eyeProtectorService';
 
-import * as Notifications from "expo-notifications";
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
-import { registerEyeProtectorTask, scheduleReminders } from '../services/eyeProtectorService';
-
-// ✅✅✅ নোটিফিকেশন হ্যান্ডলারটি এখানে ঠিক করা হয়েছে ✅✅✅
+// Notification handler for when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
-    // 'shouldShowAlert' এর পরিবর্তে নিচের দুটি ব্যবহার করতে হবে
-    shouldShowBanner: true, 
-    shouldShowList: true,
   }),
 });
 
+// A placeholder for your TTS check function
 const checkAndInstallTTS = async () => {
-  // ... আপনার আগের কোড ...
+  console.log("Checking and installing TTS if needed...");
+  // Your actual TTS logic goes here
 };
+
+// Function to request notification permissions
+async function requestPermissionsAsync() {
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+
+  if (finalStatus !== 'granted') {
+    Alert.alert('Permission Required', 'Notifications are needed for reminders to work.');
+    return false;
+  }
+  
+  if (Platform.OS === 'android') {
+    // This channel is a default fallback. Specific channels should be created where needed.
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  return true;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
+  
+  // Load fonts and check for errors
+  const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    // Add other fonts here if you have them
   });
 
   useEffect(() => {
-    async function requestPermissionsAndSetup() {
-      // ... আপনার আগের পারমিশন এবং TTS চেকের কোড ...
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== "granted") {
-        await Notifications.requestPermissionsAsync();
+    async function setupAppAndHideSplash() {
+      try {
+        // Run all setup tasks concurrently for faster loading
+        await Promise.all([
+            (async () => {
+                const permissionsGranted = await requestPermissionsAsync();
+                if (permissionsGranted) {
+                    await registerEyeProtectorTask();
+                }
+            })(),
+            checkAndInstallTTS(),
+        ]);
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        // Hide the splash screen once everything is ready
+        await SplashScreen.hideAsync();
       }
-      await checkAndInstallTTS();
-
-      await registerEyeProtectorTask();
-      await scheduleReminders();
     }
 
-    requestPermissionsAndSetup();
-  }, []);
+    // Only run setup and hide splash screen if fonts are loaded or there's an error
+    if (fontsLoaded || fontError) {
+      setupAppAndHideSplash();
+    }
+  }, [fontsLoaded, fontError]);
 
-  if (!loaded) {
+  // If fonts are not loaded and there is no error, return null to keep the splash screen visible.
+  if (!fontsLoaded && !fontError) {
     return null;
   }
 
+  // Render the app layout
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <View style={{ flex: 1 }}>
@@ -74,7 +117,7 @@ export default function RootLayout() {
           <Stack.Screen name="+not-found" />
         </Stack>
       </View>
-      <StatusBar style="auto" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
   );
 }

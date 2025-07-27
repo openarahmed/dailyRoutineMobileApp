@@ -108,12 +108,9 @@ export default function EyeProtectorScreen() {
     }
   };
 
-  // ✅✅✅ এই ফাংশনটি আপডেট করা হয়েছে ✅✅✅
   const handleSaveSettings = useCallback(() => {
-    // ধাপ ১: ব্যবহারকারীকে সাথে সাথে আগের পেজে ফিরিয়ে দেওয়া হবে
     router.back();
 
-    // ধাপ ২: সেটিংস সেভ করা এবং নোটিফিকেশন শিডিউল করার কাজটি ব্যাকগ্রাউন্ডে হবে
     const saveAndSchedule = async () => {
         const newSettings: EyeProtectorSettings = { 
             isEnabled, 
@@ -126,7 +123,6 @@ export default function EyeProtectorScreen() {
         await scheduleReminders();
     };
 
-    // উপরের async ফাংশনটিকে কল করা হচ্ছে, কিন্তু এর জন্য অপেক্ষা করা হচ্ছে না
     saveAndSchedule();
 
   }, [isEnabled, startTime, endTime, eyeSound, breakSound, router]);

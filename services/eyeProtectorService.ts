@@ -33,7 +33,7 @@ export async function registerEyeProtectorTask() {
           return;
         }
         await BackgroundFetch.registerTaskAsync(EYE_PROTECTOR_TASK, {
-          minimumInterval: 60 * 60,
+          minimumInterval: 60 * 60, // runs roughly every hour
           stopOnTerminate: false,
           startOnBoot: true,
         });
@@ -44,12 +44,8 @@ export async function registerEyeProtectorTask() {
 }
 
 export async function scheduleReminders() {
-  const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
-  for (const notif of allScheduled) {
-    if (notif.identifier && notif.identifier.startsWith('eye-protector-')) {
-      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-    }
-  }
+  await Notifications.cancelAllScheduledNotificationsAsync();
+  console.log('Cleared all previous scheduled notifications.');
 
   const settingsStr = await AsyncStorage.getItem('@eye_protector_settings');
   const settings: EyeProtectorSettings = settingsStr 
@@ -57,7 +53,7 @@ export async function scheduleReminders() {
     : { isEnabled: false, startTime: '09:00', endTime: '17:00', eyeSound: 'default', breakSound: 'default' };
 
   if (!settings.isEnabled) {
-    console.log('Eye Protector is disabled.');
+    console.log('Eye Protector is disabled. No new reminders will be set.');
     return;
   }
 
@@ -71,47 +67,49 @@ export async function scheduleReminders() {
     return;
   }
   
-  console.log('Scheduling production-level reminders for the rest of the day...');
+  console.log(`Scheduling reminders from ${settings.startTime} to ${settings.endTime}`);
   
-  // ✅✅✅ প্রোডাকশন লেভেলের সময় সেট করা হয়েছে ✅✅✅
   const EYE_INTERVAL_MINUTES = 20; 
   const LONG_BREAK_INTERVAL_MINUTES = 60;
 
+  // Schedule 20-minute eye breaks
   let eyeBreakTime = new Date(officeStart.getTime());
   let eyeCounter = 0;
   while (eyeBreakTime <= officeEnd) {
-    if (eyeBreakTime > now) {
+    if (eyeBreakTime > now && eyeBreakTime.getMinutes() !== officeStart.getMinutes()) {
       await Notifications.scheduleNotificationAsync({
         identifier: `eye-protector-eye-${eyeCounter++}`,
         content: {
           title: '👀 Time for an Eye Break!',
-          body: 'Look at something 20m away for 20 seconds.',
+          body: 'Look at something 20 feet away for 20 seconds.',
           sound: settings.eyeSound === 'default' ? true : settings.eyeSound,
         },
+        // ✅ UPDATED TRIGGER FORMAT
         trigger: { type: 'date', date: eyeBreakTime },
       });
     }
     eyeBreakTime.setMinutes(eyeBreakTime.getMinutes() + EYE_INTERVAL_MINUTES);
   }
 
+  // Schedule 60-minute long breaks
   let longBreakTime = new Date(officeStart.getTime());
-  if (longBreakTime.getMinutes() > 0) {
-      longBreakTime.setHours(longBreakTime.getHours() + 1);
-      longBreakTime.setMinutes(0);
-  }
   let longBreakCounter = 0;
   while (longBreakTime <= officeEnd) {
     if (longBreakTime > now) {
-         await Notifications.scheduleNotificationAsync({
+        await Notifications.scheduleNotificationAsync({
             identifier: `eye-protector-long-${longBreakCounter++}`,
             content: {
                 title: '🧠 Take a Short Break!',
                 body: 'Step away from your screen for 5 minutes.',
                 sound: settings.breakSound === 'default' ? true : settings.breakSound,
             },
+            // ✅ UPDATED TRIGGER FORMAT
             trigger: { type: 'date', date: longBreakTime },
         });
     }
     longBreakTime.setMinutes(longBreakTime.getMinutes() + LONG_BREAK_INTERVAL_MINUTES);
   }
+  
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  console.log(`Successfully scheduled ${scheduled.length} reminders.`);
 }

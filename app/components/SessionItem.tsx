@@ -3,91 +3,60 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 // Type Definitions
-type Session = { 
+export type Session = { 
   id: string; 
   title: string; 
   start: string; 
   end: string; 
-  completed?: boolean; 
+  notificationId?: string;
+  completed?: boolean;
+  activeDays: number[];
+  isOneTime?: boolean;
+  createdAt?: number;
 };
 
 type SessionItemProps = { 
   item: Session; 
-  onToggle: (item: Session) => void; 
+  onToggle: (item: Session) => Promise<void>; 
   onEdit: (item: Session) => void; 
   onDelete: (id: string) => void; 
 };
 
-// ✅✅✅ উন্নত এবং বিস্তৃত getIconForTask ফাংশন ✅✅✅
-const getIconForTask = (title: string) => {
-    const lower = title.toLowerCase();
-
-    // Specific Activities (বেশি নির্দিষ্ট কাজগুলো আগে চেক করা হচ্ছে)
-    if (lower.includes("code review")) return "rate-review";
-    if (lower.includes("stand-up") || lower.includes("meeting")) return "people";
-    if (lower.includes("yoga") || lower.includes("meditation")) return "self-improvement";
-    if (lower.includes("prayer") || lower.includes("namaz")) return "spa";
-    if (lower.includes("cardio") || lower.includes("running") || lower.includes("walk")) return "directions-run";
-    if (lower.includes("strength training") || lower.includes("gym") || lower.includes("exercise") || lower.includes("workout")) return "fitness-center";
-    if (lower.includes("script writing") || lower.includes("journaling") || lower.includes("writer")) return "edit";
-    if (lower.includes("recording") || lower.includes("videos") || lower.includes("content creator")) return "videocam";
-    if (lower.includes("painting") || lower.includes("sketching") || lower.includes("artist")) return "palette";
-    if (lower.includes("shopping") || lower.includes("grocery") || lower.includes("market")) return "shopping-cart";
-    if (lower.includes("email") || lower.includes("communication") || lower.includes("calls") || lower.includes("client")) return "email";
-    if (lower.includes("social media") || lower.includes("engagement")) return "share";
-    if (lower.includes("analytics") || lower.includes("report")) return "analytics";
-    if (lower.includes("plan") || lower.includes("strategy") || lower.includes("scheduling")) return "event-note";
-    
-    // General Categories (সাধারণ কাজ)
-    if (lower.includes("code") || lower.includes("develop") || lower.includes("coding") || lower.includes("debug")) return "code";
-    if (lower.includes("study") || lower.includes("homework") || lower.includes("revision") || lower.includes("lectures") || lower.includes("student")) return "school";
-    if (lower.includes("read") || lower.includes("book") || lower.includes("literature")) return "menu-book";
-    if (lower.includes("work") || lower.includes("office") || lower.includes("project")) return "work";
-    if (lower.includes("breakfast") || lower.includes("lunch") || lower.includes("dinner")) return "restaurant";
-    if (lower.includes("break") || lower.includes("relax") || lower.includes("leisure")) return "free-breakfast";
-    if (lower.includes("sleep") || lower.includes("nap")) return "hotel";
-    if (lower.includes("clean")) return "cleaning-services";
-    if (lower.includes("commute") || lower.includes("travel")) return "commute";
-    if (lower.includes("family")) return "family-restroom";
-    if (lower.includes("health") || lower.includes("doctor") || lower.includes("therapy")) return "medical-services";
-    if (lower.includes("wake up") || lower.includes("prepare")) return "wb-sunny";
-    if (lower.includes("hobby") || lower.includes("personal")) return "star";
-
-    // Default Icon (যদি কোনো কিছুই না মেলে)
-    return "list-alt";
+const getIconStyle = (title: string): { name: string; color: string } => {
+    const lowerCaseTitle = title.toLowerCase();
+    if (lowerCaseTitle.includes("exercise") || lowerCaseTitle.includes("gym") || lowerCaseTitle.includes("workout")) return { name: "fitness-center", color: "#FF9500" }; // Orange
+    if (lowerCaseTitle.includes("study") || lowerCaseTitle.includes("math") || lowerCaseTitle.includes("science") || lowerCaseTitle.includes("homework")) return { name: "book", color: "#007AFF" }; // Blue
+    if (lowerCaseTitle.includes("breakfast") || lowerCaseTitle.includes("lunch") || lowerCaseTitle.includes("dinner")) return { name: "restaurant", color: "#34C759" }; // Green
+    if (lowerCaseTitle.includes("break") || lowerCaseTitle.includes("relax")) return { name: "free-breakfast", color: "#AF52DE" }; // Purple
+    if (lowerCaseTitle.includes("read") || lowerCaseTitle.includes("journaling")) return { name: "menu-book", color: "#5856D6" }; // Indigo
+    if (lowerCaseTitle.includes("work") || lowerCaseTitle.includes("office") || lowerCaseTitle.includes("meeting")) return { name: "work", color: "#5AC8FA" }; // Teal
+    if (lowerCaseTitle.includes("sleep") || lowerCaseTitle.includes("nap")) return { name: "hotel", color: "#8E8E93" }; // Gray
+    if (lowerCaseTitle.includes("walk") || lowerCaseTitle.includes("cardio")) return { name: "directions-walk", color: "#FFCF00" }; // Yellow
+    if (lowerCaseTitle.includes("shopping") || lowerCaseTitle.includes("market")) return { name: "shopping-cart", color: "#FF3B30" }; // Red
+    if (lowerCaseTitle.includes("code") || lowerCaseTitle.includes("develop")) return { name: "code", color: "#A2845E" }; // Brown
+    return { name: "list-alt", color: "#8E8E93" }; // Default Gray
 };
 
-
-// The SessionItem Component
 const SessionItem = React.memo(({ item, onToggle, onEdit, onDelete }: SessionItemProps) => {
   
-  // Alert for deleting a session
-  const handleDeletePress = () => Alert.alert(
-    "Delete Session", 
-    "Are you sure you want to delete this session?", 
+  const showOptions = () => Alert.alert(
+    item.title, 
+    "What would you like to do?", 
     [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => onDelete(item.id) }
+      { text: "Edit Task", onPress: () => onEdit(item) },
+      { text: "Delete Task", style: "destructive", onPress: () => onDelete(item.id) },
+      { text: "Cancel", style: "cancel" }
     ]
   );
 
-  const taskIcon = getIconForTask(item.title);
-  const itemContainerStyle = item.completed 
-    ? [styles.sessionItem, styles.sessionItemCompleted] 
-    : styles.sessionItem;
+  const { name: taskIcon, color: taskIconColor } = getIconStyle(item.title);
 
   return (
-    // The main container is a View
-    <View style={itemContainerStyle}>
-        {/* The left icon is the only touchable area to toggle completion */}
-        <TouchableOpacity onPress={() => onToggle(item)} style={[styles.taskIconContainer, item.completed && styles.taskIconContainerCompleted]}>
-            {item.completed 
-              ? <MaterialIcons name="check" size={24} color="#FFFFFF" /> 
-              : <MaterialIcons name={taskIcon as any} size={22} color="#FFFFFF" />
-            }
-        </TouchableOpacity>
+    <TouchableOpacity style={styles.sessionItem} onLongPress={showOptions} activeOpacity={0.7}>
+        <View style={styles.taskIconContainer}>
+            <MaterialIcons name={taskIcon as any} size={22} color={taskIconColor} />
+        </View>
 
-        {/* Middle Text Content */}
         <View style={styles.taskTextContainer}>
             <Text style={[styles.sessionTimeText, item.completed && styles.sessionTextCompleted]}>
               {`${item.start} - ${item.end}`}
@@ -97,32 +66,25 @@ const SessionItem = React.memo(({ item, onToggle, onEdit, onDelete }: SessionIte
             </Text>
         </View>
 
-        {/* Right Action Buttons */}
-        {!item.completed && (
-            <View style={styles.actionButtonsContainer}>
-                <TouchableOpacity style={styles.iconButton} onPress={() => onEdit(item)}>
-                  <MaterialIcons name="edit" size={20} color="#A0A0A0" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} onPress={handleDeletePress}>
-                  <MaterialIcons name="delete" size={20} color="#FF6347" />
-                </TouchableOpacity>
+        <TouchableOpacity onPress={() => onToggle(item)} style={styles.checkboxWrapper}>
+            <View style={[styles.checkboxBase, item.completed && styles.checkboxChecked]}>
+                {item.completed && <MaterialIcons name="check" size={18} color="#FFFFFF" />}
             </View>
-        )}
-    </View>
+        </TouchableOpacity>
+    </TouchableOpacity>
   );
 });
 
-// Stylesheet for the component
 const styles = StyleSheet.create({
     sessionItem:{
         flexDirection:'row',
         alignItems:'center',
         padding: 12,
-        marginBottom: 12,
+        marginBottom: 8,
         borderRadius: 18,
         backgroundColor: 'rgba(0, 0, 0, 0.1)',
         borderWidth: 2,
-        borderColor: 'rgba(154, 152, 152, 0.06)',
+        borderColor: 'rgba(47, 43, 69, 0.28)',
     },
     sessionItemCompleted:{
         backgroundColor:'rgba(0, 122, 255, 0.2)', 
@@ -131,42 +93,44 @@ const styles = StyleSheet.create({
     taskIconContainer:{
         width: 44,
         height: 44,
-        borderRadius: 10,
+        borderRadius: 22,
         justifyContent:'center',
         alignItems:'center',
-        backgroundColor:'rgba(67, 67, 68, 0.18)', 
         marginRight: 12,
-        
-    },
-    taskIconContainerCompleted:{
-        backgroundColor:'#007AFF',
     },
     taskTextContainer:{
-        flex:1
+        flex:1,
+        marginRight: 10,
     },
     sessionTimeText:{
         color:'#AEAEB2',
-        fontSize:14,
-        fontWeight:'500'
+        fontSize:13,
     },
     sessionText:{
         color:'#FFFFFF',
-        fontSize:17,
-        fontWeight:'600',
+        fontSize:15,
         marginTop:2
     },
     sessionTextCompleted:{
         color:'#8E8E93',
         textDecorationLine:'line-through',
     },
-    actionButtonsContainer:{
-        flexDirection:'row',
-        alignItems:'center'
+    checkboxWrapper: {
+        padding: 5,
     },
-    iconButton:{
-        marginLeft:4,
-        padding:6
-    }
+    checkboxBase: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: '#4A4466',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkboxChecked: {
+        backgroundColor: '#007AFF',
+        borderColor: '#007AFF',
+    },
 });
 
 export default SessionItem;

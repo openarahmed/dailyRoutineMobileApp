@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "StudyRoutineApp",
+    "name": "Daily Routine",
     "slug": "StudyRoutineApp",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "studyroutineapp",
+    "icon": "./assets/images/app-main-icon.png",
+    "scheme": "dailyroutineapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -13,24 +13,24 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/app-main-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.StudyRoutineApp",
+      "package": "com.shakil.DailyRoutineApp",
       "permissions": ["NOTIFICATIONS"]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/app-main-icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/app-main-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -39,9 +39,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-icon.png",
-          "color": "#ffffff",
-          "sounds": ["default"]
+          "icon": "./assets/images/app-notification-icon.png",
+          "color": "#ffffff"
         }
       ]
     ],

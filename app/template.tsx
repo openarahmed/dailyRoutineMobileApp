@@ -49,7 +49,7 @@ export default function TemplateTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0e0e10",
+    backgroundColor: "#0b111d",
     paddingHorizontal: 12,
     paddingTop: 10,
   },
@@ -64,12 +64,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: "#1c1c1f",
+    backgroundColor: "#101727ff",
     padding: 18,
     borderRadius: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#2e2e3e",
+    borderColor: "#2e2e3e5f",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,

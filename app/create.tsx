@@ -104,8 +104,8 @@ export default function CreateRoutineScreen() {
     try {
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: "📚",
-          body: `Time to start: ${title}`,
+          title: "Time to start!",
+          body: `${title}`,
           sound: "default",
         },
         trigger: {

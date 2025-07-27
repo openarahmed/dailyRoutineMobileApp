@@ -13,8 +13,8 @@ export const scheduleNotification = async (
   try {
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: "📚",
-        body: `Time to start: ${title}`,
+        title: "Time to start!",
+        body: `${title}`,
         sound: "default", // Consider using 'true' for default sound or a specific sound file
       },
       trigger: { type: "date", date },
