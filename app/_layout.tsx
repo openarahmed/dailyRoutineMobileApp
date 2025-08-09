@@ -48,6 +48,7 @@ async function requestPermissionsAsync() {
 
 function RootLayoutContent() {
   const { themeName, colors } = useTheme();
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.backgroundColor }}>
       <Stack
@@ -63,6 +64,13 @@ function RootLayoutContent() {
             headerShown: false, 
             presentation: 'modal',
             contentStyle: { backgroundColor: colors.backgroundColor } 
+          }} 
+        />
+        <Stack.Screen 
+          name="themes" // 👈 Name must be lowercase
+          options={{ 
+            headerShown: false, 
+            presentation: 'modal' 
           }} 
         />
         <Stack.Screen name="+not-found" />
