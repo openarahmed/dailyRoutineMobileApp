@@ -1,5 +1,3 @@
-// app/(tabs)/settings.tsx
-
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker, {
@@ -22,13 +20,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-import { formatTime } from "../../utils/timeHelpers"; // Make sure this utility exists
+import { ThemeName, useTheme } from "../../context/ThemeContext";
+import { formatTime } from "../../utils/timeHelpers";
 
 const { width, height } = Dimensions.get('window');
 const guidelineBaseWidth = 375;
 const guidelineBaseHeight = 812;
-
 const scale = (size: number) => (width / guidelineBaseWidth) * size;
 const verticalScale = (size: number) => (height / guidelineBaseHeight) * size;
 const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
@@ -38,28 +35,39 @@ const runDailyAIChecks = async (force = false) => {
 };
 
 export default function SettingsScreen() {
+  const { colors, themeName, setThemeName } = useTheme();
   const [isEnabled, setIsEnabled] = useState<boolean>(true);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState<boolean>(true);
   const [sleepTime, setSleepTime] = useState<Date | null>(null);
   const [showSleepTimePicker, setShowSleepTimePicker] = useState<boolean>(false);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeName>(themeName);
 
   useEffect(() => {
-    AsyncStorage.getItem("notificationsEnabled").then((value) => {
-      setIsEnabled(value === null ? true : value === "true");
-    });
-    AsyncStorage.getItem("voiceNotificationsEnabled").then((value) => {
-      setIsVoiceEnabled(value === null ? true : value === "true");
-    });
-    AsyncStorage.getItem("userSleepTime").then((value) => {
-      if (value) {
-        setSleepTime(new Date(value));
-      } else {
-        const defaultSleepTime = new Date();
-        defaultSleepTime.setHours(23, 0, 0);
-        setSleepTime(defaultSleepTime);
+    const loadSettings = async () => {
+      try {
+        const notifEnabled = await AsyncStorage.getItem("notificationsEnabled");
+        if (notifEnabled !== null) setIsEnabled(notifEnabled === "true");
+        const voiceEnabled = await AsyncStorage.getItem("voiceNotificationsEnabled");
+        if (voiceEnabled !== null) setIsVoiceEnabled(voiceEnabled === "true");
+        const storedSleepTime = await AsyncStorage.getItem("userSleepTime");
+        if (storedSleepTime) {
+          setSleepTime(new Date(storedSleepTime));
+        } else {
+          const defaultSleepTime = new Date();
+          defaultSleepTime.setHours(23, 0, 0);
+          setSleepTime(defaultSleepTime);
+        }
+        const storedTheme = await AsyncStorage.getItem("userTheme");
+        if (storedTheme) {
+          setThemeName(storedTheme as ThemeName);
+          setSelectedTheme(storedTheme as ThemeName);
+        }
+      } catch (e) {
+        console.error("Failed to load settings:", e);
       }
-    });
-  }, []);
+    };
+    loadSettings();
+  }, [setThemeName]);
 
   const toggleSwitch = async () => {
     try {
@@ -97,6 +105,12 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleThemeChange = async (theme: ThemeName) => {
+    setSelectedTheme(theme);
+    setThemeName(theme);
+    await AsyncStorage.setItem("userTheme", theme);
+  };
+
   const handleSleepTimeChange = async (
     event: DateTimePickerEvent,
     selectedDate?: Date
@@ -125,46 +139,70 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.backgroundColor }]}>
       <ScrollView style={styles.container}>
         <View style={styles.headerContainer}>
-            <Text style={styles.heading}>Settings</Text>
+          <Text style={[styles.heading, { color: colors.textColor }]}>Settings</Text>
+        </View>
+        
+        <View style={[styles.settingRow, { backgroundColor: colors.settingRowBg }]}>
+          <Text style={[styles.text, { color: colors.textColor }]}>Theme</Text>
+          <View style={styles.themeButtons}>
+            <TouchableOpacity 
+              onPress={() => handleThemeChange('light')} 
+              style={[styles.themeButton, selectedTheme === 'light' && { borderColor: colors.accentColor }]}
+            >
+              <Text style={[styles.themeButtonText, { color: colors.textColor }]}>Light</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => handleThemeChange('dark')}
+              style={[styles.themeButton, selectedTheme === 'dark' && { borderColor: colors.accentColor }]}
+            >
+              <Text style={[styles.themeButtonText, { color: colors.textColor }]}>Dark</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => handleThemeChange('classic')}
+              style={[styles.themeButton, selectedTheme === 'classic' && { borderColor: colors.accentColor }]}
+            >
+              <Text style={[styles.themeButtonText, { color: colors.textColor }]}>Classic</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Link href="/eye-protector" asChild>
-          <TouchableOpacity style={styles.settingRow}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                  <Ionicons name="eye-outline" size={moderateScale(22)} color="#007AFF" style={{marginRight: scale(15)}}/>
-                  <Text style={styles.text}>Eye Protector</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={moderateScale(22)} color="#8A8A8E" />
+          <TouchableOpacity style={[styles.settingRow, { backgroundColor: colors.settingRowBg }]}>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <Ionicons name="eye-outline" size={moderateScale(22)} color={colors.accentColor} style={{marginRight: scale(15)}}/>
+              <Text style={[styles.text, { color: colors.textColor }]}>Eye Protector</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={moderateScale(22)} color={colors.iconColor} />
           </TouchableOpacity>
         </Link>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.text}>Enable Notifications</Text>
+        <View style={[styles.settingRow, { backgroundColor: colors.settingRowBg }]}>
+          <Text style={[styles.text, { color: colors.textColor }]}>Enable Notifications</Text>
           <Switch
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isEnabled ? "#007AFF" : "#f4f3f4"}
+            trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+            thumbColor={isEnabled ? colors.accentColor : colors.switchThumbOff}
             onValueChange={toggleSwitch}
             value={isEnabled}
           />
         </View>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.text}>Enable Voice Notifications</Text>
+        <View style={[styles.settingRow, { backgroundColor: colors.settingRowBg }]}>
+          <Text style={[styles.text, { color: colors.textColor }]}>Enable Voice Notifications</Text>
           <Switch
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isVoiceEnabled ? "#007AFF" : "#f4f3f4"}
+            trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+            thumbColor={isVoiceEnabled ? colors.accentColor : colors.switchThumbOff}
             onValueChange={toggleVoiceSwitch}
             value={isVoiceEnabled}
           />
         </View>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.text}>Set Bedtime</Text>
+        <View style={[styles.settingRow, { backgroundColor: colors.settingRowBg }]}>
+          <Text style={[styles.text, { color: colors.textColor }]}>Set Bedtime</Text>
           <TouchableOpacity onPress={() => setShowSleepTimePicker(true)}>
-            <Text style={styles.timeText}>{sleepTime ? formatTime(sleepTime) : "Tap to set"}</Text>
+            <Text style={[styles.timeText, { color: colors.accentColor }]}>{sleepTime ? formatTime(sleepTime) : "Tap to set"}</Text>
           </TouchableOpacity>
         </View>
 
@@ -173,16 +211,16 @@ export default function SettingsScreen() {
             mode="time"
             value={sleepTime || new Date()}
             display="spinner"
+            textColor={Platform.OS === 'ios' ? colors.textColor : colors.modalBg}
             onChange={handleSleepTimeChange}
-            textColor={Platform.OS === 'ios' ? '#FFFFFF' : '#000'}
           />
         )}
 
-        <View style={styles.testButtonContainer}>
+        <View style={[styles.testButtonContainer, { backgroundColor: colors.testButtonBg }]}>
           <Button
             title="Test Voice Output"
             onPress={handleTestVoice}
-            color="#007AFF"
+            color={colors.accentColor}
           />
         </View>
       </ScrollView>
@@ -193,7 +231,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#0b111d",
   },
   container: {
     flex: 1,
@@ -209,31 +246,42 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: moderateScale(32, 0.4),
     fontWeight: "bold",
-    color: "#FFFFFF",
     textAlign: 'left',
   },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "rgba(44, 44, 46, 0.7)",
     padding: moderateScale(15),
     borderRadius: moderateScale(12),
     marginBottom: verticalScale(12),
   },
   text: {
     fontSize: moderateScale(16),
-    color: "#fff",
   },
   timeText: {
     fontSize: moderateScale(16),
-    color: "#007AFF",
     fontWeight: "bold",
+  },
+  themeButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  themeButton: {
+    paddingHorizontal: scale(15),
+    paddingVertical: verticalScale(8),
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    marginLeft: scale(10),
+    borderColor: 'transparent',
+  },
+  themeButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
   },
   testButtonContainer: {
     marginTop: verticalScale(30),
     marginHorizontal: scale(20),
-    backgroundColor: '#1C1C1E',
     borderRadius: moderateScale(12),
     overflow: 'hidden',
   },

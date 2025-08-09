@@ -1,4 +1,4 @@
-package com.anonymous.StudyRoutineApp
+package com.shakil.DailyRoutineApp
 
 import android.app.Application
 import android.content.res.Configuration

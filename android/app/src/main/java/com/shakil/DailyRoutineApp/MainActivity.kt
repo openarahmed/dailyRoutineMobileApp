@@ -1,4 +1,4 @@
-package com.anonymous.StudyRoutineApp
+package com.shakil.DailyRoutineApp
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
