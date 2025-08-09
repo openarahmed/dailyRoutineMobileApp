@@ -1,8 +1,8 @@
 export const cardColors: { [key: string]: { topLeft: string; topRight: string; bottom: string[] } } = {
   Morning: {
-    topLeft: '#88482fff',  // টপ-লেফট কোণার কমলা রঙ
-    topRight: '#24223c', // টপ-রাইট কোণার হলুদ রঙ
-    bottom: ['#171a26', '#171a26'], // নিচের ডার্ক গ্রেডিয়েন্ট
+    topLeft: '#ba4f25ff',  // টপ-লেফট কোণার কমলা রঙ
+    topRight: '#2f2a67ff', // টপ-রাইট কোণার হলুদ রঙ
+    bottom: ['#181b27', '#181b27'], // নিচের ডার্ক গ্রেডিয়েন্ট
   },
   Midday: {
     topLeft: '#2f2470ff',  // টপ-লেফট কোণার আকাশী রঙ
@@ -11,7 +11,7 @@ export const cardColors: { [key: string]: { topLeft: string; topRight: string; b
   },
   Evening: {
     topLeft: '#3b0642ff',  // টপ-লেফট কোণার পার্পল রঙ
-    topRight: '#74415cff', // টপ-রাইট কোণার গোলাপী রঙ
+    topRight: '#452737ff', // টপ-রাইট কোণার গোলাপী রঙ
     bottom: ['#171a26', '#171a26'], // নিচের ডার্ক গ্রেডিয়েন্ট
   },
   Night: {

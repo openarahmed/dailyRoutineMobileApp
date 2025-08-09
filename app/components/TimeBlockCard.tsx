@@ -10,7 +10,7 @@ import SessionItem, { Session } from './SessionItem'; // SessionItem থেক�
 type Section = { title: string; iconName: string; data: Session[]; };
 type TimeBlockCardProps = { 
     section: Section; 
-    onToggle: (item: Session) => Promise<void>; // ✅ টাইপটি আপডেট করা হয়েছে
+    onToggle: (item: Session) => Promise<void>;
     onEdit: (item: Session) => void; 
     onDelete: (id: string) => void; 
 };
@@ -29,25 +29,31 @@ const TimeBlockCard = ({ section, onToggle, onEdit, onDelete }: TimeBlockCardPro
   return (
     <View style={styles.cardContainer}>
       
+      {/* লেয়ার ১: বেস গ্রেডিয়েন্ট (নিচের অংশ) */}
       <LinearGradient
         colors={colors.bottom as [string, string]}
         style={StyleSheet.absoluteFill}
       />
 
+      {/* লেয়ার ২: টপ-লেফট কর্নারের আভা */}
       <LinearGradient
         colors={[colors.topLeft, 'transparent']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 0.8, y: 0.5 }}
+        // ✅ পরিবর্তন: গ্রেডিয়েন্টটি এখন কার্ডের কেন্দ্রের দিকে এসে মিলিয়ে যাবে
+        end={{ x: 0.5, y: 0.5 }}
         style={styles.cornerGradient}
       />
 
+      {/* লেয়ার ৩: টপ-রাইট কর্নারের আভা */}
       <LinearGradient
         colors={[colors.topRight, 'transparent']}
         start={{ x: 1, y: 0 }}
-        end={{ x: 0.2, y: 0.5 }}
+        // ✅ পরিবর্তন: গ্রেডিয়েন্টটি এখন কার্ডের কেন্দ্রের দিকে এসে মিলিয়ে যাবে
+        end={{ x: 0.5, y: 0.5 }}
         style={styles.cornerGradient}
       />
       
+      {/* লেয়ার ৪: মূল কন্টেন্ট */}
       <View style={styles.contentContainer}>
         <View style={styles.timeBlockHeader}>
           <MaterialIcons name={section.iconName as any} size={22} color={iconColor} />
@@ -64,8 +70,8 @@ const TimeBlockCard = ({ section, onToggle, onEdit, onDelete }: TimeBlockCardPro
 
 const styles = StyleSheet.create({
   cardContainer: {
-    borderRadius: 20,
-    marginBottom: 12,
+    borderRadius: 17,
+    marginBottom: 7,
     overflow: 'hidden',
     position: 'relative',
     borderWidth: 1,
@@ -77,7 +83,7 @@ const styles = StyleSheet.create({
     top: 0,
     width: '100%',
     height: '100%',
-    opacity: 0.5, 
+    opacity: 0.4,
   },
   contentContainer: {
     paddingHorizontal: 10,

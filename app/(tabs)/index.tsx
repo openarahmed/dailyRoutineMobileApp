@@ -99,7 +99,6 @@ const calculateNextTriggerDate = (session: Session): Date | null => {
     }
     return null;
 };
-
 // =================================================================
 // --- WeekDayScroller Component ---
 // =================================================================
@@ -121,10 +120,13 @@ const WeekDayScroller = ({ selectedDay, onDaySelect, taskCounts }: {
                         style={[styles.dateButton, isSelected && styles.selectedDateButton]}
                         onPress={() => onDaySelect(index)}
                     >
-                        {/* ✅ পরিবর্তন: isSelected হলে এখন আলাদা স্টাইল পাবে */}
                         <View style={[styles.dateTopHalf, isSelected && styles.selectedDateTopHalf]}>
                             <Text style={[styles.dateDayName, isSelected && styles.selectedDateText]}>{dayName}</Text>
                         </View>
+                        
+                        {/* ✅ নতুন শ্যাডো লাইনটি এখানে যোগ করা হয়েছে */}
+                        <View style={styles.dividerShadow} />
+
                         <View style={[styles.dateBottomHalf, isSelected && styles.selectedDateBottomHalf]}>
                             <Text style={[styles.dateDayNumber, isSelected && styles.selectedDateText]}>{count}</Text>
                         </View>
@@ -134,7 +136,6 @@ const WeekDayScroller = ({ selectedDay, onDaySelect, taskCounts }: {
         </View>
     );
 };
-
 // =================================================================
 // --- DaySelector Component (For Modals) ---
 // =================================================================
@@ -751,7 +752,7 @@ const styles = StyleSheet.create({
     coinText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: moderateScale(16) },
     
      scrollerContainer: {
-        paddingBottom: verticalScale(12),
+        paddingBottom: verticalScale(10),
         flexDirection: 'row',
         justifyContent: 'space-around',
     },
@@ -762,28 +763,45 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
+        // শ্যাডো দেখানোর জন্য elevation যোগ করা হয়েছে
+        elevation: 5,
     },
     selectedDateButton: {
+        borderColor: '#c9395a',
     },
-    dateTopHalf: {
+     dateTopHalf: {
         flex: 1,
-        backgroundColor: '#1c1c1e',
+        backgroundColor: '#1c1c1e', // ✅ পরিবর্তন: এখানে গাঢ় রঙটি দেওয়া হয়েছে
         alignItems: 'center',
         justifyContent: 'center',
     },
     dateBottomHalf: {
         flex: 1,
-        backgroundColor: '#2c2c2e',
+        backgroundColor: '#2c2c2e', // ✅ পরিবর্তন: এখানে হালকা রঙটি দেওয়া হয়েছে
         alignItems: 'center',
         justifyContent: 'center',
     },
-    // ✅ নতুন স্টাইল: সিলেক্ট করা দিনের উপরের অংশের জন্য
     selectedDateTopHalf: {
         backgroundColor: '#c9395a',
     },
-    // ✅ নতুন স্টাইল: সিলেক্ট করা দিনের নিচের অংশের জন্য
     selectedDateBottomHalf: {
-        backgroundColor: '#7e2237ff',
+        backgroundColor: '#7e2237',
+    },
+    // ✅✅✅ শ্যাডো লাইনের জন্য নতুন স্টাইল ✅✅✅
+    dividerShadow: {
+        height: 1.5,
+        width: '100%',
+        backgroundColor: 'rgba(50, 48, 48, 0.3)', // হালকা কালো রঙের লাইন
+        // iOS-এর জন্য শ্যাডো
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 1,
+        },
+        shadowOpacity: 0.5,
+        shadowRadius: 1,
+        // Android-এর জন্য elevation
+        elevation: 3,
     },
     dateDayName: {
         color: '#AEAEB2',
@@ -798,16 +816,16 @@ const styles = StyleSheet.create({
     selectedDateText: {
         color: '#FFFFFF',
     },
-
     statusContainer: { 
-        marginBottom: verticalScale(10),
+        marginBottom: verticalScale(7),
         paddingHorizontal:moderateScale(14),
-        borderRadius: moderateScale(15),
+        paddingVertical: verticalScale(5),
+        borderRadius: moderateScale(12),
         borderWidth: 1,
         borderColor: 'rgba(89, 80, 137, 0.45)',
     },
-    statusRow: { flexDirection: "row", alignItems: "center", paddingVertical: verticalScale(4) },
-    statusText: { color: "#E0E0E0", fontSize: moderateScale(14), flexShrink: 1, marginLeft: scale(8) },
+    statusRow: { flexDirection: "row", alignItems: "center",},
+    statusText: { color: "#E0E0E0", fontSize: moderateScale(12), flexShrink: 1, marginLeft: scale(8) },
     
     noSessionsContainer: { alignItems: "center", marginTop: verticalScale(80), opacity: 0.7, paddingHorizontal: scale(20) },
     noSessionsText: { color: "#A0A0A0", fontSize: moderateScale(18), fontWeight: '600' },
