@@ -98,13 +98,12 @@ const WeekDayScroller = ({ selectedDay, onDaySelect, taskCounts, colors }: {
                 return (
                     <TouchableOpacity 
                         key={index}
-                        style={[styles.dateButton, { borderColor: isSelected ? colors.accentColor : colors.borderColor }]}
-                        onPress={() => onDaySelect(index)}
+                          style={[styles.dateButton, { borderColor: isSelected ? colors.accentColor : colors.weekDayButtonBorder }]}
+    onPress={() => onDaySelect(index)}
                     >
                         <View style={[styles.dateTopHalf, { backgroundColor: isSelected ? colors.selectedTopBg : colors.unselectedTopBg }]}>
                             <Text style={[styles.dateDayName, { color: isSelected ? colors.selectedText : colors.unselectedDayNameText }]}>{dayName}</Text>
                         </View>
-                        <View style={[styles.dividerShadow, { backgroundColor: colors.dividerShadowColor }]} />
                         <View style={[styles.dateBottomHalf, { backgroundColor: isSelected ? colors.selectedBottomBg : colors.unselectedBottomBg }]}>
                             <Text style={[styles.dateDayNumber, { color: isSelected ? colors.selectedText : colors.unselectedDayNumberText }]}>{count}</Text>
                         </View>
@@ -468,7 +467,7 @@ export default function HomeScreen() {
             />
 
             <View style={styles.headerContainer}>
-                <Text style={[styles.heading, { color: colors.textColor }]}>My Routine</Text>
+                <Text style={[styles.heading, { color: colors.routineTitleColor }]}>My Routine</Text>
                 <View style={styles.headerIcons}>
                     <TouchableOpacity style={styles.iconButton}>
                         <Ionicons name="search" size={24} color={colors.textColor} />
@@ -489,7 +488,8 @@ export default function HomeScreen() {
                 taskCounts={taskCounts}
                 colors={{
                     accentColor: colors.accentColor,
-                    borderColor: colors.borderColor,
+                    // এই লাইনটিকেই পরিবর্তন করতে হবে
+                    borderColor: colors.weekDayButtonBorder, 
                     selectedTopBg: colors.selectedTopBg,
                     unselectedTopBg: colors.unselectedTopBg,
                     selectedBottomBg: colors.selectedBottomBg,
@@ -501,31 +501,39 @@ export default function HomeScreen() {
                 }}
             />
 
-            {displayedSessions.length > 0 && (
-                <LinearGradient
-                    colors={statusCardGradientColors} // 👈 Use the new variable here
-                    start={{ x: 1, y: 0 }} end={{ x: 0, y: 0 }}
-                    style={[styles.statusContainer, { borderColor: colors.statusCardBorder }]}
-                >
-                    <View style={styles.statusRow}>
-                        <MaterialIcons name="play-arrow" size={20} color="#34D399" />
-                        <Text style={[styles.statusText, { color: colors.statusText }]} numberOfLines={1}>{currentTask ? `Current: ${currentTask.title}` : "No current task."}</Text>
-                    </View>
-                    <View style={styles.statusRow}>
-                        <MaterialIcons name="skip-next" size={20} color="#FBBF24" />
-                        <Text style={[styles.statusText, { color: colors.statusText }]} numberOfLines={1}>
-                            {nextTask ? (
-                                <>
-                                    {`Next: ${nextTask.title} in `}
-                                    <Text style={{ fontWeight: 'bold' }}>{formatCountdown(countdownMs ?? 0)}</Text>
-                                </>
-                            ) : (
-                                "No upcoming tasks."
-                            )}
+  {displayedSessions.length > 0 && (
+    <LinearGradient
+        colors={colors.statusCardGradient || [colors.statusCardBg, colors.statusCardBg]}
+        start={{ x: 1, y: 0 }} end={{ x: 0, y: 0 }}
+        style={[styles.statusContainer, { borderColor: colors.statusCardBorder }]}
+    >
+        {/* আইকন এখন থিমের রঙ ব্যবহার করবে */}
+        <View style={[styles.statusIconContainer, { backgroundColor: colors.statusIconBg }]}>
+            <Ionicons name="play" size={18} color={colors.statusIconColor} />
+        </View>
+
+        <View style={styles.statusTextContainer}>
+            {/* প্রথম লাইন এখন থিমের রঙ ব্যবহার করবে */}
+            <Text style={[styles.statusText, { color: colors.statusInfoText }]}>
+                {currentTask ? `Current: ${currentTask.title}` : "No current task."}
+            </Text>
+
+            {/* দ্বিতীয় লাইন এখন থিমের রঙ ব্যবহার করবে */}
+            <Text style={[styles.statusText, { color: colors.statusInfoText, marginTop: 2 }]} numberOfLines={1}>
+                {nextTask ? (
+                    <>
+                        {'Next: '}
+                        <Text style={{ color: colors.accentColor, fontWeight: 'bold' }}>
+                            {`${nextTask.title} in ${formatCountdown(countdownMs ?? 0)}`}
                         </Text>
-                    </View>
-                </LinearGradient>
-            )}
+                    </>
+                ) : (
+                    "No upcoming tasks."
+                )}
+            </Text>
+        </View>
+    </LinearGradient>
+)}
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {groupedSessions.length > 0 ? (
@@ -726,53 +734,61 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
     },
+   
     dateButton: {
-        borderRadius: 15,
-        width: 46,
-        height: 50,
+        borderRadius: 14,
+        width: 42,
+        height: 48,
         overflow: 'hidden',
         borderWidth: 1,
-        elevation: 5,
     },
     dateTopHalf: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-end', // লেখাকে নিচে পাঠায়
+        paddingBottom: 2,           // নিজের বক্সের একদম নিচে ২ পিক্সেল জায়গা রাখে
     },
     dateBottomHalf: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start', // লেখাকে উপরে পাঠায়
     },
-    dividerShadow: {
-        height: 1.5,
-        width: '100%',
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 1,
-        },
-        shadowOpacity: 0.5,
-        shadowRadius: 1,
-        elevation: 3,
-    },
+   
     dateDayName: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
     },
     dateDayNumber: {
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: 'bold',
     },
-    statusContainer: { 
-        marginBottom: 7,
-        paddingHorizontal: 14,
-        paddingVertical: 5,
-        borderRadius: 12,
+    statusContainer: {
+        marginBottom: 15,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 16, // ছবির মতো গোল কর্নার
         borderWidth: 1,
+        flexDirection: 'row', // আইকন এবং টেক্সটকে পাশাপাশি আনে
+        alignItems: 'center', // আইকন এবং টেক্সটকে উল্লম্বভাবে মাঝখানে রাখে
     },
-    statusRow: { flexDirection: "row", alignItems: "center",},
-    statusText: { fontSize: 12, flexShrink: 1, marginLeft: 8 },
+    // নতুন আইকন কন্টেইনারের জন্য স্টাইল
+    statusIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 16, // এটিকে বৃত্তাকার করে
+        backgroundColor: '#DEF7EC', // হালকা সবুজ ব্যাকগ্রাউন্ড
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12, // আইকন এবং টেক্সটের মধ্যে স্পেস
+    },
+    // নতুন টেক্সট কন্টেইনারের জন্য স্টাইল
+    statusTextContainer: {
+        flex: 1, // বাকি জায়গা পুরোটাই নেয়
+    },
+    statusText: {
+        fontSize: 14, // আপনার চাহিদা অনুযায়ী ফন্ট সাইজ বাড়ানো হয়েছে
+        flexShrink: 1,
+    },
     
     noSessionsContainer: { alignItems: "center", marginTop: 80, opacity: 0.7, paddingHorizontal: 20 },
     noSessionsText: { fontSize: 18, fontWeight: '600' },

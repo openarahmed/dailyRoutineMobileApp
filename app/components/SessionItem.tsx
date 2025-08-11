@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
         padding: 12,
         marginBottom: 5,
         borderRadius: 15,
-        borderWidth: 2,
+        borderWidth: 1,
     },
     taskIconContainer:{
         width: 44,

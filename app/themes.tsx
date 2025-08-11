@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "expo-router"; // 👈 Import useNavigation hook
-import React, { useRef } from "react";
+import * as Haptics from 'expo-haptics';
+import { useNavigation } from "expo-router";
+import React from "react";
 import {
-    Animated,
     Dimensions,
+    ImageBackground,
     ScrollView,
     StyleSheet,
     Text,
@@ -13,158 +14,106 @@ import {
 import { ThemeName, themes, useTheme } from "../context/ThemeContext";
 
 // --- Responsive scaling ---
-const { width, height } = Dimensions.get("window");
-const guidelineBaseWidth = 375;
-const guidelineBaseHeight = 812;
-const scale = (size: number) => (width / guidelineBaseWidth) * size;
-const verticalScale = (size: number) => (height / guidelineBaseHeight) * size;
-const moderateScale = (size: number, factor = 0.5) =>
-    size + (scale(size) - size) * factor;
+const { width } = Dimensions.get("window");
+const cardWidth = width / 2 - 24; // Two cards per row with padding
+
+// A simple map to hold our beautiful preview backgrounds
+const themePreviews = {
+    light: {
+        // A simple gradient for a clean look
+        type: 'gradient',
+        colors: ['#EFEFEF', '#FFFFFF'],
+        textColor: '#333333',
+        day: '24',
+        month: 'Sun',
+    },
+    dark: {
+        // Using an image for a more dynamic feel
+        type: 'image',
+        source: { uri: 'https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcS7IvYc5OhmuHiez0svyj_fypmrf_eDJVpvQlJC_GWFYfy2DOKDmbxQk4p5dBqCjdf7HbF2BL_ooiyWniKKbpSQLQ' },
+        textColor: '#FFFFFF',
+        day: '15',
+        month: 'Wed',
+    },
+    classic: {
+        // A rich, dark gradient
+        type: 'gradient',
+        colors: ['#1D2B4A', '#0B111D'],
+        textColor: '#EAEAEA',
+        day: '08',
+        month: 'Mon',
+    },
+};
+
 
 const ThemePreviewCard = ({
     themeName,
     currentTheme,
     onPress,
-}: {
-    themeName: ThemeName;
-    currentTheme: ThemeName;
-    onPress: () => void;
 }) => {
-    const colors = themes[themeName];
     const isActive = themeName === currentTheme;
-    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const preview = themePreviews[themeName];
 
-    const handlePressIn = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 1.04,
-            useNativeDriver: true,
-        }).start();
-    };
+    const CardContent = () => (
+        <View style={styles.cardContent}>
+            <View style={styles.timeContainer}>
+                <Text style={[styles.timeText, { color: preview.textColor }]}>{preview.day}</Text>
+                <Text style={[styles.dateText, { color: preview.textColor }]}>{preview.month}</Text>
+            </View>
 
-    const handlePressOut = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 1,
-            friction: 4,
-            useNativeDriver: true,
-        }).start();
-        onPress();
-    };
+            <TouchableOpacity
+                style={[styles.applyButton, { backgroundColor: isActive ? '#4CAF50' : 'rgba(255,255,255,0.8)' }]}
+                onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onPress();
+                }}
+            >
+                {isActive ? (
+                    <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
+                ) : (
+                    <Text style={styles.applyButtonText}>Apply</Text>
+                )}
+            </TouchableOpacity>
+        </View>
+    );
 
     return (
-        <Animated.View
-            style={[
-                styles.cardWrapper,
-                {
-                    transform: [{ scale: scaleAnim }],
-                    shadowColor: colors.accentColor,
-                    shadowOpacity: isActive ? 0.25 : 0.1,
-                },
-            ]}
-        >
-            <TouchableOpacity
-                style={[
-                    styles.cardContainer,
-                    {
-                        borderColor: isActive ? colors.accentColor : "transparent",
-                        backgroundColor:
-                            colors.themePreviewBg || colors.backgroundColor || "#fff",
-                    },
-                ]}
-                activeOpacity={0.9}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-            >
-                {/* Small badge for active theme */}
-                {isActive && (
-                    <View style={styles.activeBadge}>
-                        <Ionicons
-                            name="checkmark-circle"
-                            size={moderateScale(22)}
-                            color={colors.accentColor}
-                        />
-                    </View>
-                )}
-
-                {/* Phone Preview */}
-                <View
-                    style={[
-                        styles.previewPhone,
-                        { backgroundColor: colors.backgroundColor },
-                    ]}
+        <View style={styles.cardWrapper}>
+            {preview.type === 'image' ? (
+                <ImageBackground
+                    source={preview.source}
+                    style={styles.cardContainer}
+                    imageStyle={{ borderRadius: 20 }}
                 >
-                    <View
-                        style={[
-                            styles.previewHeader,
-                            { backgroundColor: colors.headerBackground },
-                        ]}
-                    >
-                        <Text
-                            style={[
-                                styles.previewHeaderText,
-                                { color: colors.headerText },
-                            ]}
-                        >
-                            Preview
-                        </Text>
-                    </View>
-                    <View style={styles.previewBody}>
-                        <Text
-                            style={[styles.previewText, { color: colors.textColor }]}
-                        >
-                            Hello, World!
-                        </Text>
-                    </View>
-                    <View
-                        style={[
-                            styles.previewTabBar,
-                            { backgroundColor: colors.tabBarColor },
-                        ]}
-                    >
-                        <Ionicons
-                            name="home-outline"
-                            size={moderateScale(18)}
-                            color={colors.accentColor}
-                        />
-                        <Ionicons
-                            name="settings-outline"
-                            size={moderateScale(18)}
-                            color={colors.tabBarInactiveTintColor}
-                        />
-                    </View>
+                    <View style={styles.overlay} />
+                    <CardContent />
+                </ImageBackground>
+            ) : (
+                <View style={[styles.cardContainer, { backgroundColor: preview.colors[0] }]}>
+                    <CardContent />
                 </View>
-
-                {/* Theme Name */}
-                <Text
-                    style={[
-                        styles.themeNameText,
-                        { color: colors.textColor, marginTop: verticalScale(10) },
-                    ]}
-                >
-                    {themeName.charAt(0).toUpperCase() + themeName.slice(1)}
-                </Text>
-            </TouchableOpacity>
-        </Animated.View>
+            )}
+            <Text style={[styles.themeNameText, { color: useTheme().colors.textColor }]}>
+                {themeName.charAt(0).toUpperCase() + themeName.slice(1)}
+            </Text>
+        </View>
     );
 };
 
 export default function ThemeSelectionScreen() {
     const { themeName, setThemeName, colors } = useTheme();
-    const navigation = useNavigation(); // 👈 Initialize navigation hook
+    const navigation = useNavigation();
 
     return (
-        <View
-            style={[styles.container, { backgroundColor: colors.backgroundColor }]}
-        >
-            {/* 👈 Add a custom header with a back button */}
+        <View style={[styles.container, { backgroundColor: colors.backgroundColor }]}>
             <View style={[styles.headerContainer, { borderBottomColor: colors.dividerLine }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Ionicons name="chevron-back" size={moderateScale(28)} color={colors.iconColor} />
+                    <Ionicons name="chevron-back" size={28} color={colors.iconColor} />
                 </TouchableOpacity>
                 <Text style={[styles.headerText, { color: colors.textColor }]}>Choose Theme</Text>
-                <View style={{ width: moderateScale(28) }} />
+                <View style={{ width: 28 }} />
             </View>
 
-            {/* Theme Cards */}
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {Object.keys(themes).map((key) => (
                     <ThemePreviewCard
@@ -182,88 +131,81 @@ export default function ThemeSelectionScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: verticalScale(40),
     },
     headerContainer: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingHorizontal: scale(15),
-        paddingBottom: verticalScale(15),
+        paddingHorizontal: 15,
+        paddingTop: 50,
+        paddingBottom: 15,
         borderBottomWidth: 1,
     },
     headerText: {
-        fontSize: moderateScale(22),
+        fontSize: 22,
         fontWeight: "bold",
     },
     scrollContent: {
-        padding: scale(15),
+        padding: 16,
         flexDirection: "row",
         flexWrap: "wrap",
-        justifyContent: "space-around",
+        justifyContent: "space-between",
     },
     cardWrapper: {
-        width: "45%",
-        aspectRatio: 1 / 1.75,
-        marginBottom: verticalScale(20),
-        shadowOffset: { width: 0, height: 5 },
-        shadowRadius: 12,
-        elevation: 4,
+        width: cardWidth,
+        marginBottom: 24,
+        alignItems: 'center',
     },
     cardContainer: {
-        flex: 1,
-        borderRadius: moderateScale(18),
-        borderWidth: 2,
-        overflow: "hidden",
-        padding: scale(8),
-        alignItems: "center",
-        justifyContent: "center",
+        width: '100%',
+        height: cardWidth * 1.7, // Taller cards
+        borderRadius: 20,
+        overflow: 'hidden',
+        justifyContent: 'flex-end',
+        padding: 12,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
     },
-    activeBadge: {
-        position: "absolute",
-        top: scale(8),
-        right: scale(8),
-        zIndex: 10,
-        backgroundColor: "rgba(255,255,255,0.7)",
-        borderRadius: 50,
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.3)',
     },
-    previewPhone: {
-        width: "100%",
-        height: "80%",
-        borderRadius: moderateScale(12),
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.1)",
-        overflow: "hidden",
+    cardContent: {
+        width: '100%',
+        alignItems: 'center',
     },
-    previewHeader: {
-        height: "15%",
-        justifyContent: "center",
-        alignItems: "center",
-        borderBottomWidth: 1,
-        borderColor: "rgba(0,0,0,0.1)",
+    timeContainer: {
+        marginBottom: 16,
+        alignItems: 'center',
     },
-    previewHeaderText: {
-        fontSize: moderateScale(12),
-        fontWeight: "bold",
+    timeText: {
+        fontSize: 36,
+        fontWeight: '300',
+        letterSpacing: 1,
     },
-    previewBody: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
+    dateText: {
+        fontSize: 14,
+        fontWeight: '600',
+        opacity: 0.8,
     },
-    previewText: {
-        fontSize: moderateScale(10),
+    applyButton: {
+        width: '100%',
+        paddingVertical: 12,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    previewTabBar: {
-        height: "15%",
-        flexDirection: "row",
-        justifyContent: "space-around",
-        alignItems: "center",
-        borderTopWidth: 1,
-        borderColor: "rgba(0,0,0,0.1)",
+    applyButtonText: {
+        color: '#000',
+        fontWeight: 'bold',
+        fontSize: 16,
     },
     themeNameText: {
-        fontSize: moderateScale(16),
+        marginTop: 12,
+        fontSize: 16,
         fontWeight: "600",
     },
 });

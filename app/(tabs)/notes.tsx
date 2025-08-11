@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
+import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
@@ -21,9 +22,16 @@ import { useTheme } from "../../context/ThemeContext";
 const { width, height } = Dimensions.get('window');
 const guidelineBaseWidth = 375;
 const guidelineBaseHeight = 812;
-const scale = (size: number) => (width / guidelineBaseWidth) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
-const verticalScale = (size: number) => (height / guidelineBaseHeight) * size;
+const scale = (size) => (width / guidelineBaseWidth) * size;
+const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
+const verticalScale = (size) => (height / guidelineBaseHeight) * size;
+
+// --- Helper for the conditional border ---
+const lightColorsForBorder = {
+    light: ['#FFFFFF', '#F2F2F2'],
+    dark: ['#2C2C2E'],
+    classic: ['#18202E']
+};
 
 type ChecklistItem = { id: string; text: string; completed: boolean; };
 type Note = {
@@ -38,24 +46,30 @@ type Note = {
     isLocked?: boolean;
 };
 
-const NoteCard = ({ note, layout, selectedNotes, handleNotePress, handleNoteLongPress, colors }: { note: Note; layout: 'grid' | 'list'; selectedNotes: string[]; handleNotePress: (note: Note) => void; handleNoteLongPress: (noteId: string) => void; colors: any; }) => {
+const NoteCard = ({ note, layout, selectedNotes, handleNotePress, handleNoteLongPress, colors, themeName }) => {
     const isSelected = selectedNotes.includes(note.id);
+    const showBorder = lightColorsForBorder[themeName]?.includes(note.color);
+
     return (
-        <TouchableOpacity 
+        <TouchableOpacity
             style={[
-                styles.noteCard, 
-                { backgroundColor: note.color }, 
-                layout === 'list' && styles.noteCardList, 
-                isSelected && { borderColor: colors.notesCardSelectedBorder }
-            ]} 
-            onPress={() => handleNotePress(note)} 
-            onLongPress={() => handleNoteLongPress(note.id)}
+                styles.noteCard,
+                { backgroundColor: note.color },
+                layout === 'list' && styles.noteCardList,
+                isSelected && { borderColor: colors.notesCardSelectedBorder, borderWidth: 2 },
+                showBorder && { borderColor: colors.notesSortDropdownBorder, borderWidth: 1 }
+            ]}
+            onPress={() => handleNotePress(note)}
+            onLongPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                handleNoteLongPress(note.id);
+            }}
         >
             {isSelected && (<View style={[styles.selectionOverlay, { backgroundColor: colors.notesSelectionOverlay }]}><Ionicons name="checkmark-circle" size={moderateScale(24)} color={colors.notesFabIcon} /></View>)}
             {note.isLocked ? <View style={[styles.lockedNoteOverlay, { backgroundColor: colors.notesLockedOverlayBg }]}><Ionicons name="lock-closed" size={moderateScale(40)} color={colors.notesFabIcon} /></View> :
             <>
                 {note.title ? (<Text style={[styles.noteTitle, { color: colors.notesModalInputTitle }]} numberOfLines={2}>{note.title}</Text>) : null}
-                {note.type === 'note' ? (<Text style={[styles.noteContent, { color: colors.notesModalInputContent }]} numberOfLines={layout === 'grid' ? 10 : 3}>{note.content}</Text>) : 
+                {note.type === 'note' ? (<Text style={[styles.noteContent, { color: colors.notesModalInputContent }]} numberOfLines={layout === 'grid' ? 10 : 3}>{note.content}</Text>) :
                 (<View>
                     {note.items?.slice(0, 5).map(item => (<View key={item.id} style={styles.checklistItemPreview}>
                         <Ionicons name={item.completed ? "checkbox" : "square-outline"} size={moderateScale(16)} color={item.completed ? colors.notesChecklistItemCompleted : colors.notesChecklistItemText} />
@@ -94,7 +108,9 @@ export default function NotesScreen() {
     const [pin, setPin] = useState("");
     const [noteToUnlock, setNoteToUnlock] = useState<Note | null>(null);
     const [isSettingPin, setIsSettingPin] = useState(false);
-    const [isColorPickerVisible, setColorPickerVisible] = useState(false);
+    const [isMultiColorPickerVisible, setMultiColorPickerVisible] = useState(false); // For multi-select
+    const [isColorPickerModalVisible, setColorPickerModalVisible] = useState(false); // For single note editor
+
     const fabAnimation = useRef(new Animated.Value(0)).current;
     const sortMenuAnimation = useRef(new Animated.Value(0)).current;
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -118,7 +134,8 @@ export default function NotesScreen() {
     }, [isSortMenuVisible]);
 
     const handleCreateNewNote = (type: 'note' | 'checklist') => {
-        const newColor = colors.noteColors && colors.noteColors[Math.floor(Math.random() * colors.noteColors.length)];
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const newColor = colors.noteColors[0];
         setCurrentNote(null); setNoteTitle(""); setNoteContent(""); setChecklistItems([]);
         setIsLocked(false); setIsPinned(false); setNoteColor(newColor || '#FFFFFF');
         setNoteType(type); setModalVisible(true); setFabMenuOpen(false);
@@ -164,24 +181,30 @@ export default function NotesScreen() {
     }, [noteTitle, noteContent, checklistItems, modalVisible, saveNote, isLocked, isPinned, noteColor]);
 
     const handleCloseModal = () => { if (debounceTimeout.current) clearTimeout(debounceTimeout.current); saveNote(); setModalVisible(false); };
+
     const handleDeleteNote = () => {
         if (!currentNote) return;
         Alert.alert("Delete Note", "Are you sure?", [{ text: "Cancel" }, { text: "Delete", style: "destructive", onPress: async () => {
             const updatedNotes = notes.filter((n) => n.id !== currentNote.id);
             setNotes(updatedNotes); await AsyncStorage.setItem("userNotes", JSON.stringify(updatedNotes)); setModalVisible(false);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }}]);
     };
+
     const handleToggleLock = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const savedPin = await AsyncStorage.getItem("user_pin");
-        if (!savedPin) {
+        if (!savedPin && !isLocked) {
             setIsSettingPin(true);
             setPinModalVisible(true);
         } else {
             setIsLocked(prev => !prev);
         }
     };
+
     const handlePinSubmit = async () => {
         if (pin.length !== 4) { Alert.alert("Error", "PIN must be 4 digits."); return; }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         if (isSettingPin) {
             await AsyncStorage.setItem("user_pin", pin);
             setIsLocked(true);
@@ -193,25 +216,45 @@ export default function NotesScreen() {
             if (pin === savedPin) {
                 setPinModalVisible(false);
                 setPin("");
-                handleEditNote({ ...noteToUnlock, isLocked: false });
+                const unlockedNote = { ...noteToUnlock, isLocked: false };
                 setNoteToUnlock(null);
+                setCurrentNote(unlockedNote);
+                setNoteTitle(unlockedNote.title);
+                setNoteType(unlockedNote.type);
+                setNoteContent(unlockedNote.content);
+                setChecklistItems(unlockedNote.items || []);
+                setIsLocked(false);
+                setIsPinned(unlockedNote.isPinned || false);
+                setNoteColor(unlockedNote.color);
+                setModalVisible(true);
             } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                 Alert.alert("Error", "Incorrect PIN.");
                 setPin("");
             }
         }
     };
+
     const handleUpdateChecklistItem = (id: string, newText: string) => setChecklistItems(items => items.map(item => item.id === id ? { ...item, text: newText } : item));
-    const handleToggleChecklistItem = (id: string) => setChecklistItems(items => items.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
-    const handleAddChecklistItem = () => setChecklistItems(items => [...items, { id: Date.now().toString(), text: "", completed: false }]);
+    const handleToggleChecklistItem = (id: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setChecklistItems(items => items.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
+    }
+    const handleAddChecklistItem = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setChecklistItems(items => [...items, { id: Date.now().toString(), text: "", completed: false }]);
+    }
     const handleDeleteChecklistItem = (id: string) => setChecklistItems(items => items.filter(item => item.id !== id));
-    
+
     const filteredAndSortedNotes = useMemo(() => {
         let filtered = notes.filter(note => {
             const query = searchQuery.toLowerCase();
-            return note.title.toLowerCase().includes(query) || (note.type === 'note' && note.content.toLowerCase().includes(query)) || (note.type === 'checklist' && note.items?.some(item => item.text.toLowerCase().includes(query)));
+            const titleMatch = note.title.toLowerCase().includes(query);
+            const contentMatch = note.type === 'note' && note.content.toLowerCase().includes(query);
+            const itemMatch = note.type === 'checklist' && note.items?.some(item => item.text.toLowerCase().includes(query));
+            return titleMatch || contentMatch || itemMatch;
         });
-        
+
         const pinned = filtered.filter(n => n.isPinned);
         const unpinned = filtered.filter(n => !n.isPinned);
         switch (sortBy) {
@@ -224,8 +267,11 @@ export default function NotesScreen() {
 
     const handleNotePress = (note: Note) => isSelectionMode ? toggleSelection(note.id) : handleEditNote(note);
     const handleNoteLongPress = (noteId: string) => !isSelectionMode && setSelectedNotes([noteId]);
-    const toggleSelection = (noteId: string) => setSelectedNotes(prev => prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]);
-    
+    const toggleSelection = (noteId: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSelectedNotes(prev => prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]);
+    }
+
     const updateSelectedNotes = (update: Partial<Note>) => {
         const updatedNotes = notes.map(note => selectedNotes.includes(note.id) ? { ...note, ...update } : note);
         setNotes(updatedNotes);
@@ -234,11 +280,13 @@ export default function NotesScreen() {
     };
 
     const handleTogglePinSelected = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const areAllPinned = notes.filter(n => selectedNotes.includes(n.id)).every(n => n.isPinned);
         updateSelectedNotes({ isPinned: !areAllPinned });
     };
-    
+
     const handleToggleLockSelected = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const savedPin = await AsyncStorage.getItem("user_pin");
         if (!savedPin) {
             Alert.alert("Set PIN First", "Please lock a single note first to set a PIN.");
@@ -247,23 +295,31 @@ export default function NotesScreen() {
         const areAllLocked = notes.filter(n => selectedNotes.includes(n.id)).every(n => n.isLocked);
         updateSelectedNotes({ isLocked: !areAllLocked });
     };
-    
+
     const handleChangeColorForSelected = (color: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         updateSelectedNotes({ color });
-        setColorPickerVisible(false);
+        setMultiColorPickerVisible(false);
     };
-    
+
     const handleDeleteSelected = () => {
         Alert.alert(`Delete ${selectedNotes.length} notes?`, "This is permanent.", [{ text: "Cancel" }, { text: "Delete", style: "destructive", onPress: async () => {
             const updatedNotes = notes.filter(note => !selectedNotes.includes(note.id));
             setNotes(updatedNotes); await AsyncStorage.setItem("userNotes", JSON.stringify(updatedNotes)); setSelectedNotes([]);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }}]);
+    };
+    
+    const handleSelectColor = (color) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setNoteColor(color);
+        setColorPickerModalVisible(false);
     };
 
     const textFabStyle = { transform: [{ scale: fabAnimation }, { translateY: fabAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -moderateScale(70)], }), },], opacity: fabAnimation };
     const checklistFabStyle = { transform: [{ scale: fabAnimation }, { translateY: fabAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, -moderateScale(130)], }), },], opacity: fabAnimation };
     const sortDropdownStyle = { opacity: sortMenuAnimation, transform: [{ translateY: sortMenuAnimation.interpolate({ inputRange: [0, 1], outputRange: [-10, 0], }), },] };
-    
+
     const leftColumnNotes = useMemo(() => filteredAndSortedNotes.filter((_, index) => index % 2 === 0), [filteredAndSortedNotes]);
     const rightColumnNotes = useMemo(() => filteredAndSortedNotes.filter((_, index) => index % 2 !== 0), [filteredAndSortedNotes]);
 
@@ -279,7 +335,7 @@ export default function NotesScreen() {
                         <TouchableOpacity onPress={handleTogglePinSelected} style={styles.headerButton}>
                             <Ionicons name="pricetag-outline" size={moderateScale(24)} color={colors.notesSearchIcon} />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setColorPickerVisible(true)} style={styles.headerButton}>
+                        <TouchableOpacity onPress={() => setMultiColorPickerVisible(true)} style={styles.headerButton}>
                             <Ionicons name="color-palette-outline" size={moderateScale(24)} color={colors.notesSearchIcon} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={handleToggleLockSelected} style={styles.headerButton}>
@@ -325,30 +381,30 @@ export default function NotesScreen() {
                     )}
                 </View>
 
-                <ScrollView contentContainerStyle={[styles.notesScroll, { paddingBottom: verticalScale(80), backgroundColor: colors.notesBackground }]} onScrollBeginDrag={() => setSortMenuVisible(false)} keyboardShouldPersistTaps="handled">
-                    {filteredAndSortedNotes.length === 0 ? (<View style={styles.emptyContainer}><Text style={[styles.emptyText, { color: colors.notesEmptyText }]}>{searchQuery ? "No notes found." : "No notes yet. Tap the '+' to add one!"}</Text></View>) : 
+                <ScrollView contentContainerStyle={{ paddingBottom: verticalScale(100) }} onScrollBeginDrag={() => setSortMenuVisible(false)} keyboardShouldPersistTaps="handled">
+                    {filteredAndSortedNotes.length === 0 ? (<View style={styles.emptyContainer}><Text style={[styles.emptyText, { color: colors.notesEmptyText }]}>{searchQuery ? "No notes found." : "No notes yet. Tap the '+' to add one!"}</Text></View>) :
                         layout === 'grid' ? (
                             <View style={[styles.notesGridContainer, { backgroundColor: colors.notesGridColumnBg }]}>
-                                <View style={styles.column}>{leftColumnNotes.map(note => <NoteCard key={note.id} note={note} layout={layout} selectedNotes={selectedNotes} handleNotePress={handleNotePress} handleNoteLongPress={handleNoteLongPress} colors={colors} />)}</View>
-                                <View style={styles.column}>{rightColumnNotes.map(note => <NoteCard key={note.id} note={note} layout={layout} selectedNotes={selectedNotes} handleNotePress={handleNotePress} handleNoteLongPress={handleNoteLongPress} colors={colors} />)}</View>
+                                <View style={styles.column}>{leftColumnNotes.map(note => <NoteCard key={note.id} note={note} layout={layout} selectedNotes={selectedNotes} handleNotePress={handleNotePress} handleNoteLongPress={handleNoteLongPress} colors={colors} themeName={themeName}/>)}</View>
+                                <View style={styles.column}>{rightColumnNotes.map(note => <NoteCard key={note.id} note={note} layout={layout} selectedNotes={selectedNotes} handleNotePress={handleNotePress} handleNoteLongPress={handleNoteLongPress} colors={colors} themeName={themeName}/>)}</View>
                             </View>
-                        ) : (<View>{filteredAndSortedNotes.map(note => <NoteCard key={note.id} note={note} layout={layout} selectedNotes={selectedNotes} handleNotePress={handleNotePress} handleNoteLongPress={handleNoteLongPress} colors={colors} />)}</View>)
+                        ) : (<View>{filteredAndSortedNotes.map(note => <NoteCard key={note.id} note={note} layout={layout} selectedNotes={selectedNotes} handleNotePress={handleNotePress} handleNoteLongPress={handleNoteLongPress} colors={colors} themeName={themeName}/>)}</View>)
                     }
                 </ScrollView>
-                
+
                 {!isSelectionMode && (
                     <>
                         {isFabMenuOpen && (<TouchableOpacity style={styles.fabBackdrop} activeOpacity={1} onPress={() => setFabMenuOpen(false)} />)}
                         <Animated.View style={[styles.secondaryFabContainer, textFabStyle]}>
                             <Text style={[styles.fabLabel, { backgroundColor: colors.notesFabLabelBg, color: colors.notesFabLabelText }]}>Text</Text>
-                            <TouchableOpacity style={[styles.secondaryFab, { backgroundColor: colors.notesFabIcon }]} onPress={() => handleCreateNewNote('note')}>
-                                <Ionicons name="document-text-outline" size={moderateScale(24)} color={colors.notesBackground} />
+                            <TouchableOpacity style={[styles.secondaryFab, { backgroundColor: colors.notesFabBg }]} onPress={() => handleCreateNewNote('note')}>
+                                <Ionicons name="document-text-outline" size={moderateScale(24)} color={colors.notesFabIcon} />
                             </TouchableOpacity>
                         </Animated.View>
                         <Animated.View style={[styles.secondaryFabContainer, checklistFabStyle]}>
                             <Text style={[styles.fabLabel, { backgroundColor: colors.notesFabLabelBg, color: colors.notesFabLabelText }]}>List</Text>
-                            <TouchableOpacity style={[styles.secondaryFab, { backgroundColor: colors.notesFabIcon }]} onPress={() => handleCreateNewNote('checklist')}>
-                                <Ionicons name="list-outline" size={moderateScale(24)} color={colors.notesBackground} />
+                            <TouchableOpacity style={[styles.secondaryFab, { backgroundColor: colors.notesFabBg }]} onPress={() => handleCreateNewNote('checklist')}>
+                                <Ionicons name="list-outline" size={moderateScale(24)} color={colors.notesFabIcon} />
                             </TouchableOpacity>
                         </Animated.View>
                         <TouchableOpacity style={[styles.fab, { backgroundColor: colors.notesFabBg }]} onPress={() => setFabMenuOpen(!isFabMenuOpen)}>
@@ -358,7 +414,7 @@ export default function NotesScreen() {
                 )}
 
                 <Modal visible={modalVisible} animationType="slide" onRequestClose={handleCloseModal}>
-                    <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.notesModalBg }]}>
+                    <SafeAreaView style={[styles.modalContainer, { backgroundColor: noteColor }]}>
                         <View style={[styles.modalHeader, { borderBottomColor: colors.notesSortDropdownBorder }]}>
                             <TouchableOpacity onPress={handleCloseModal} style={styles.headerButton}>
                                 <Ionicons name="arrow-back" size={moderateScale(28)} color={colors.notesFooterIconActive} />
@@ -368,9 +424,9 @@ export default function NotesScreen() {
                                 <Ionicons name="trash-outline" size={moderateScale(28)} color={colors.deleteIconColor} />
                             </TouchableOpacity>)}
                         </View>
-                        <ScrollView contentContainerStyle={{flexGrow: 1}} keyboardShouldPersistTaps="handled">
-                            <TextInput placeholder="Title" placeholderTextColor={colors.notesModalInputPlaceholder} style={[styles.modalInputTitle, { backgroundColor: colors.notesModalInputTitleBg, color: colors.notesModalInputTitle }]} value={noteTitle} onChangeText={setNoteTitle} />
-                            {noteType === 'note' ? (<TextInput placeholder="Take a note..." placeholderTextColor={colors.notesModalInputPlaceholder} style={[styles.modalInputContent, { color: colors.notesModalInputContent }]} value={noteContent} onChangeText={setNoteContent} multiline autoFocus={currentNote === null} />) : 
+                        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+                            <TextInput placeholder="Title" placeholderTextColor={colors.notesModalInputPlaceholder} style={[styles.modalInputTitle, { color: colors.notesModalInputTitle }]} value={noteTitle} onChangeText={setNoteTitle} />
+                            {noteType === 'note' ? (<TextInput placeholder="Take a note..." placeholderTextColor={colors.notesModalInputPlaceholder} style={[styles.modalInputContent, { color: colors.notesModalInputContent }]} value={noteContent} onChangeText={setNoteContent} multiline autoFocus={currentNote === null} />) :
                                 (<View style={styles.checklistContainer}>
                                     {checklistItems.map((item, index) => (<View key={item.id} style={styles.checklistItem}>
                                         <TouchableOpacity onPress={() => handleToggleChecklistItem(item.id)}>
@@ -381,7 +437,7 @@ export default function NotesScreen() {
                                             <Ionicons name="close-circle-outline" size={moderateScale(22)} color={colors.notesFooterIcon} />
                                         </TouchableOpacity>
                                     </View>))}
-                                    <TouchableOpacity style={styles.addChecklistItemButton} onPress={handleAddChecklistItem}>
+                                    <TouchableOpacity style={[styles.addChecklistItemButton, { borderTopColor: colors.notesModalInputPlaceholder}]} onPress={handleAddChecklistItem}>
                                         <Ionicons name="add" size={moderateScale(20)} color={colors.notesAddChecklistItemText} />
                                         <Text style={[styles.addChecklistItemText, { color: colors.notesAddChecklistItemText }]}>Add Item</Text>
                                     </TouchableOpacity>
@@ -389,35 +445,45 @@ export default function NotesScreen() {
                             }
                         </ScrollView>
                         <View style={[styles.modalFooter, { backgroundColor: colors.notesFooterBg, borderTopColor: colors.notesSortDropdownBorder }]}>
-                            <TouchableOpacity onPress={() => setIsPinned(p => !p)} style={styles.footerButton}>
+                            <TouchableOpacity onPress={() => {Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setIsPinned(p => !p)}} style={styles.footerButton}>
                                 <Ionicons name={isPinned ? "pricetag" : "pricetag-outline"} size={moderateScale(24)} color={isPinned ? colors.notesFooterIconActive : colors.notesFooterIcon} />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={handleToggleLock} style={styles.footerButton}>
                                 <Ionicons name={isLocked ? "lock-closed" : "lock-open-outline"} size={moderateScale(24)} color={isLocked ? colors.deleteIconColor : colors.notesFooterIcon} />
                             </TouchableOpacity>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{alignItems: 'center'}}>
-                                {colors.noteColors && colors.noteColors.map(color => <TouchableOpacity key={color} style={[styles.colorOption, {backgroundColor: color}, noteColor === color && { borderColor: colors.notesColorOptionSelected }]} onPress={() => setNoteColor(color)} />)}
-                            </ScrollView>
+                            <TouchableOpacity onPress={() => {Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setColorPickerModalVisible(true);}} style={styles.footerButton}>
+                                <Ionicons name="color-palette-outline" size={moderateScale(24)} color={colors.notesFooterIcon} />
+                            </TouchableOpacity>
                         </View>
                     </SafeAreaView>
                 </Modal>
+
+                <Modal visible={isColorPickerModalVisible || isMultiColorPickerVisible} transparent animationType="fade" onRequestClose={() => {setColorPickerModalVisible(false); setMultiColorPickerVisible(false)}}>
+                     <TouchableOpacity style={styles.colorPickerBackdrop} activeOpacity={1} onPress={() => {setColorPickerModalVisible(false); setMultiColorPickerVisible(false)}} />
+                     <View style={[styles.colorPickerModalContainer, { backgroundColor: colors.notesSortDropdownBg }]}>
+                        <Text style={[styles.pinModalTitle, {color: colors.notesHeader}]}>Note color</Text>
+                        <View style={styles.colorGrid}>
+                             {colors.noteColors.map(color => (
+                                <TouchableOpacity key={color} style={styles.colorSwatch} onPress={() => isMultiColorPickerVisible ? handleChangeColorForSelected(color) : handleSelectColor(color)}>
+                                    <View style={[styles.colorCircle, {backgroundColor: color}, (noteColor === color && !isMultiColorPickerVisible) && {borderColor: colors.notesColorOptionSelected, borderWidth: 3}]} >
+                                         {(noteColor === color && !isMultiColorPickerVisible) && <Ionicons name="checkmark" size={moderateScale(20)} color={colors.notesColorOptionSelected} />}
+                                    </View>
+                                </TouchableOpacity>
+                             ))}
+                        </View>
+                     </View>
+                </Modal>
+                
                 <Modal visible={isPinModalVisible} transparent animationType="fade" onRequestClose={() => setPinModalVisible(false)}>
                     <View style={[styles.pinModalBackdrop, { backgroundColor: colors.notesLockedOverlayBg }]}>
-                        <View style={[styles.pinModalContainer, { backgroundColor: colors.notesSortDropdownBg }]}>
+                        <View style={[styles.pinModalContainer, { backgroundColor: colors.notesSortDropdownBg, borderColor: colors.notesSortDropdownBorder }]}>
                             <Text style={[styles.pinModalTitle, { color: colors.notesHeader }]}>{isSettingPin ? "Set a 4-Digit PIN" : "Enter PIN"}</Text>
-                            <TextInput style={[styles.pinInput, { backgroundColor: colors.notesSearchBg, color: colors.notesModalInput }]} value={pin} onChangeText={setPin} keyboardType="number-pad" maxLength={4} secureTextEntry autoFocus />
+                            <TextInput style={[styles.pinInput, { backgroundColor: colors.notesSearchBg, color: colors.notesModalInput, borderColor: colors.notesSortDropdownBorder }]} value={pin} onChangeText={setPin} keyboardType="number-pad" maxLength={4} secureTextEntry autoFocus />
                             <TouchableOpacity style={[styles.pinSubmitButton, { backgroundColor: colors.notesFooterIconActive }]} onPress={handlePinSubmit}>
-                                <Text style={[styles.pinSubmitButtonText, { color: colors.notesFabIcon }]}>Submit</Text>
+                                <Text style={[styles.pinSubmitButtonText, { color: colors.notesFabIcon }]}>{isSettingPin ? "Set PIN" : "Unlock"}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
-                </Modal>
-                <Modal visible={isColorPickerVisible} transparent animationType="fade" onRequestClose={() => setColorPickerVisible(false)}>
-                    <TouchableOpacity style={[styles.pinModalBackdrop, { backgroundColor: colors.notesLockedOverlayBg }]} activeOpacity={1} onPress={() => setColorPickerVisible(false)}>
-                        <View style={[styles.colorPickerContainer, { backgroundColor: colors.notesSortDropdownBg }]}>
-                            {colors.noteColors && colors.noteColors.map(color => <TouchableOpacity key={color} style={[styles.colorOption, {backgroundColor: color, margin: 8, width: 40, height: 40, borderRadius: 20}, noteColor === color && { borderColor: colors.notesColorOptionSelected }]} onPress={() => handleChangeColorForSelected(color)} />)}
-                        </View>
-                    </TouchableOpacity>
                 </Modal>
             </View>
         </SafeAreaView>
@@ -431,20 +497,19 @@ const styles = StyleSheet.create({
     selectionHeaderContainer: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginTop: Platform.OS === "android" ? verticalScale(40) : verticalScale(20), marginBottom: verticalScale(15), height: verticalScale(56), paddingHorizontal: scale(5) },
     selectionHeaderText: { fontSize: moderateScale(18), fontWeight: 'bold', flex: 1, marginLeft: scale(15) },
     heading: { fontSize: moderateScale(32, 0.4), fontWeight: "bold", textAlign: 'left' },
-    searchWrapper: { position: 'relative', zIndex: 10, marginBottom: verticalScale(20) },
+    searchWrapper: { position: 'relative', zIndex: 10, marginBottom: verticalScale(10) },
     searchContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: moderateScale(10) },
     searchIcon: { paddingLeft: scale(12) },
-    searchInput: { flex: 1, fontSize: moderateScale(16), paddingVertical: verticalScale(12), paddingHorizontal: scale(10), borderWidth: 2, borderColor: 'transparent' },
+    searchInput: { flex: 1, fontSize: moderateScale(16), paddingVertical: verticalScale(12), paddingHorizontal: scale(10) },
     toolbarIconTouchable: { padding: moderateScale(12) },
-    sortDropdown: { position: 'absolute', top: verticalScale(55), right: 0, borderRadius: moderateScale(8), width: scale(150), elevation: 5, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, borderWidth: 1 },
+    sortDropdown: { position: 'absolute', top: verticalScale(55), right: 0, borderRadius: moderateScale(8), width: scale(150), elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, borderWidth: 1 },
     sortOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: verticalScale(12), paddingHorizontal: scale(15), borderBottomWidth: 1 },
     sortOptionText: { fontSize: moderateScale(14) },
     sortOptionTextActive: { fontWeight: 'bold' },
-    notesGridContainer: { flexDirection: 'row', justifyContent: 'space-between' },
+    notesGridContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: verticalScale(10) },
     column: { width: '48.5%' },
-    noteCard: { width: "100%", padding: moderateScale(15), borderRadius: moderateScale(12), marginBottom: verticalScale(15), borderWidth: 2, borderColor: "transparent", maxHeight: verticalScale(280) },
+    noteCard: { width: "100%", padding: moderateScale(15), borderRadius: moderateScale(12), marginBottom: verticalScale(15), maxHeight: verticalScale(280) },
     noteCardList: { width: '100%', marginBottom: verticalScale(15), maxHeight: verticalScale(180) },
-    noteCardSelected: { borderColor: '#007AFF' },
     selectionOverlay: { ...StyleSheet.absoluteFillObject, borderRadius: moderateScale(10), justifyContent: 'center', alignItems: 'center' },
     lockedNoteOverlay: { ...StyleSheet.absoluteFillObject, borderRadius: moderateScale(10), justifyContent: 'center', alignItems: 'center' },
     noteTitle: { fontSize: moderateScale(16), fontWeight: "bold", marginBottom: verticalScale(8) },
@@ -452,31 +517,64 @@ const styles = StyleSheet.create({
     noteCardFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: verticalScale(8), gap: scale(8) },
     emptyContainer: { width: '100%', marginTop: verticalScale(50), alignItems: 'center' },
     emptyText: { fontSize: moderateScale(16), textAlign: "center" },
-    fab: { position: "absolute", width: moderateScale(60), height: moderateScale(60), alignItems: "center", justifyContent: "center", right: scale(20), bottom: verticalScale(30), borderRadius: moderateScale(30), elevation: 8, zIndex: 10 },
+    fab: { position: "absolute", width: moderateScale(60), height: moderateScale(60), alignItems: "center", justifyContent: "center", right: scale(20), bottom: verticalScale(30), borderRadius: moderateScale(30), elevation: 8, zIndex: 11 },
     modalContainer: { flex: 1 },
     modalHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: scale(10), paddingVertical: verticalScale(10), borderBottomWidth: 1 },
     headerButton: { padding: moderateScale(8) },
-    modalInputTitle: { fontSize: moderateScale(24), fontWeight: "bold", paddingHorizontal: scale(20), paddingTop: verticalScale(20), paddingBottom: verticalScale(10) },
-    modalInputContent: { fontSize: moderateScale(18), flex: 1, textAlignVertical: "top", paddingHorizontal: scale(20), paddingTop: verticalScale(15), lineHeight: moderateScale(26) },
+    modalInputTitle: { fontSize: moderateScale(24), fontWeight: "bold", paddingHorizontal: scale(20), paddingTop: verticalScale(20), paddingBottom: verticalScale(10), backgroundColor: 'transparent' },
+    modalInputContent: { fontSize: moderateScale(18), flex: 1, textAlignVertical: "top", paddingHorizontal: scale(20), paddingTop: verticalScale(15), lineHeight: moderateScale(26), backgroundColor: 'transparent' },
     checklistContainer: { paddingHorizontal: scale(20) },
     checklistItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: verticalScale(8) },
-    checklistItemInput: { flex: 1, fontSize: moderateScale(16), marginLeft: scale(12), marginRight: scale(8), borderWidth: 0, paddingVertical: 0 },
+    checklistItemInput: { flex: 1, fontSize: moderateScale(16), marginLeft: scale(12), marginRight: scale(8), paddingVertical: 0, backgroundColor: 'transparent' },
     checklistItemPreview: { flexDirection: 'row', alignItems: 'center', marginBottom: verticalScale(4) },
     checklistItemPreviewText: { fontSize: moderateScale(13), marginLeft: scale(8) },
     moreItemsText: { fontSize: moderateScale(12), fontStyle: 'italic', marginTop: verticalScale(4) },
-    fabBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
-    secondaryFabContainer: { position: 'absolute', right: scale(20), bottom: verticalScale(30), alignItems: 'center', flexDirection: 'row' },
-    secondaryFab: { width: moderateScale(48), height: moderateScale(48), borderRadius: moderateScale(24), justifyContent: 'center', alignItems: 'center', marginLeft: scale(10) },
-    fabLabel: { backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: scale(8), paddingVertical: verticalScale(4), borderRadius: moderateScale(4), marginRight: scale(10), fontSize: moderateScale(12) },
-    modalFooter: { flexDirection: 'row', alignItems: 'center', padding: moderateScale(10), borderTopWidth: 1 },
+    fabBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 10 },
+    secondaryFabContainer: { position: 'absolute', right: scale(20), bottom: verticalScale(30), alignItems: 'center', flexDirection: 'row', zIndex: 11 },
+    secondaryFab: { width: moderateScale(48), height: moderateScale(48), borderRadius: moderateScale(24), justifyContent: 'center', alignItems: 'center', marginLeft: scale(10), elevation: 6 },
+    fabLabel: { paddingHorizontal: scale(8), paddingVertical: verticalScale(4), borderRadius: moderateScale(4), marginRight: scale(10), fontSize: moderateScale(12), elevation: 6 },
+    modalFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: moderateScale(5), borderTopWidth: 1 },
     footerButton: { padding: moderateScale(10) },
-    colorOption: { width: moderateScale(28), height: moderateScale(28), borderRadius: moderateScale(14), marginHorizontal: scale(5), borderWidth: 2, borderColor: 'transparent' },
-    colorOptionSelected: { borderColor: '#fff' },
-    pinModalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    pinModalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
     pinModalContainer: { width: '80%', borderRadius: moderateScale(14), padding: moderateScale(20), alignItems: 'center', borderWidth: 1 },
     pinModalTitle: { fontSize: moderateScale(18), fontWeight: 'bold', marginBottom: verticalScale(15) },
     pinInput: { fontSize: moderateScale(22), textAlign: 'center', borderRadius: moderateScale(8), padding: moderateScale(10), width: '80%', marginBottom: verticalScale(20), letterSpacing: 10, borderWidth: 1 },
     pinSubmitButton: { paddingVertical: verticalScale(12), borderRadius: moderateScale(8), width: '80%', alignItems: 'center' },
     pinSubmitButtonText: { fontWeight: 'bold', fontSize: moderateScale(16) },
-    colorPickerContainer: { backgroundColor: '#2C2C2E', borderRadius: moderateScale(14), padding: moderateScale(10), flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+    addChecklistItemButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: verticalScale(12), borderTopWidth: 1, borderStyle: 'dashed', marginTop: verticalScale(8) },
+    addChecklistItemText: { fontSize: moderateScale(16), marginLeft: scale(10), fontWeight: '500' },
+    // New Color Picker Styles
+    colorPickerBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)'},
+    colorPickerModalContainer: { 
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopLeftRadius: moderateScale(20),
+        borderTopRightRadius: moderateScale(20),
+        padding: moderateScale(20),
+        paddingBottom: verticalScale(40), // For safe area
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+    },
+    colorGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginTop: verticalScale(10),
+    },
+    colorSwatch: {
+        width: '25%', // 4 columns
+        alignItems: 'center',
+        marginBottom: verticalScale(20),
+    },
+    colorCircle: {
+        width: moderateScale(44),
+        height: moderateScale(44),
+        borderRadius: moderateScale(22),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 });
