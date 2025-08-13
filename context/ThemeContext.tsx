@@ -84,7 +84,7 @@ export const themes = {
     testButtonBg: '#C0C0C0',
     noSessionsText: '#4A4A4A',
     noSessionsSubText: '#666666',
-    focusBackground: '#F5F5F5',
+    focusBackground: '#f7f9fb',
     focusHeading: '#000000',
     focusSwitcherBg: '#E0E0E0',
     focusSwitcherText: '#666666',

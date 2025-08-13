@@ -11,6 +11,7 @@ import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text
 import CustomTimePicker from "../components/CustomTimePicker";
 import TimeBlockCard from "../components/TimeBlockCard";
 
+import { Link } from "expo-router";
 import { useTheme } from "../../context/ThemeContext";
 import { formatCountdown, formatTime, timeStringToDate, timeToMinutes } from "../../utils/timeHelpers";
 
@@ -35,6 +36,7 @@ TaskManager.defineTask(VOICE_NOTIFICATION_TASK, async ({ data, error }) => {
 export type Session = {
     id: string;
     title: string;
+     category: string; // 👈 Ei notun line-ti add korun
     start: string;
     end: string;
     notificationId?: string;
@@ -43,7 +45,8 @@ export type Session = {
     isOneTime?: boolean;
     createdAt?: number;
 };
-type HistoryRecord = { id: string; title: string; start: string; end: string; completedAt: string; };
+type HistoryRecord = { id: string; title: string; start: string; end: string;     category: string;
+ completedAt: string; };
 type Section = { title: string; iconName: string; data: Session[]; };
 
 const WEEK_DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -275,6 +278,8 @@ export default function HomeScreen() {
         const newSession: Session = {
             id: Date.now().toString(),
             title: newSessionTitle,
+                    category: "General", // 👈 Add this default category
+
             start: formatTime(newSessionStartDate),
             end: formatTime(newSessionEndDate),
             activeDays: isOneTimeTask ? [new Date().getDay()] : newSessionActiveDays,
@@ -319,6 +324,8 @@ export default function HomeScreen() {
                 history.push({
                     id: sessionToToggle.id,
                     title: sessionToToggle.title,
+                                category: sessionToToggle.category || "General", // 👈 Add this line
+
                     start: sessionToToggle.start,
                     end: sessionToToggle.end,
                     completedAt: new Date().toISOString(),
@@ -472,9 +479,11 @@ export default function HomeScreen() {
                     <TouchableOpacity style={styles.iconButton}>
                         <Ionicons name="search" size={24} color={colors.textColor} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconButton}>
-                        <Ionicons name="calendar-outline" size={24} color={colors.textColor} />
-                    </TouchableOpacity>
+                      <Link href="/Calender" asChild>
+                        <TouchableOpacity style={styles.iconButton}>
+                            <Ionicons name="calendar-outline" size={24} color={colors.textColor} />
+                        </TouchableOpacity>
+                    </Link>
                     <TouchableOpacity style={[styles.coinContainer, { backgroundColor: colors.coinContainerBg }]} onPress={() => setCoinInfoModalVisible(true)}>
                         <Text style={styles.coinIcon}>🪙</Text>
                         <Text style={[styles.coinText, { color: colors.coinText }]}>{coins}</Text>
