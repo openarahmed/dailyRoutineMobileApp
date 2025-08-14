@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
 // Reusable Card Components
@@ -23,41 +23,49 @@ const CardDescription = ({ children }) => {
     return <Text style={[styles.cardDescription, { color: colors.noSessionsSubText }]}>{children}</Text>;
 };
 
+// Color helper function
+const getColorForHours = (hours, maxHours, colorPalette) => {
+    if (hours === 0) return colorPalette.level0;
+    const percentage = hours / maxHours;
+    if (percentage <= 0.25) return colorPalette.level1;
+    if (percentage <= 0.50) return colorPalette.level2;
+    if (percentage <= 0.75) return colorPalette.level3;
+    return colorPalette.level4;
+};
+
 const MonthlyOverview = ({ data }) => {
     const { colors } = useTheme();
     const [selectedDay, setSelectedDay] = useState(null);
+
+    const heatmapColors = {
+        level0: 'rgba(128, 128, 128, 0.2)',
+        level1: '#E0F7FA',
+        level2: '#B2EBF2',
+        level3: '#4DD0E1',
+        level4: '#00ACC1',
+    };
 
     if (!data || data.length === 0) {
         return null;
     }
 
-    // --- THE FIX: A more robust calculation for cell size to prevent wrapping ---
-    const cardPadding = 16; // Padding inside the card
-    const screenPadding = 15; // Padding of the ScrollView container
-    const totalHorizontalPadding = (cardPadding + screenPadding) * 2;
-    const gridWidth = Dimensions.get('window').width - totalHorizontalPadding;
-    const cellSize = gridWidth / 7.5; // Divide by a slightly larger number to ensure fit
-
     const today = new Date();
     const todayDateUTC = today.getUTCDate();
     const firstDayDateObject = new Date(data[0].fullDate);
-    const firstDayOfMonth = firstDayDateObject.getUTCDay();
     const isCurrentMonth = firstDayDateObject.getUTCMonth() === today.getUTCMonth() && firstDayDateObject.getUTCFullYear() === today.getUTCFullYear();
-    
-    const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
     const handleDayPress = (day) => {
-        if (day.hours > 0) {
-            setSelectedDay(day);
-        } else {
-            setSelectedDay(null); // Clear selection for empty days
-        }
+        setSelectedDay(day?.hours > 0 ? day : null);
     };
-    
-    const formattedDate = selectedDay ? 
+
+    const formattedDate = selectedDay ?
         new Date(selectedDay.fullDate).toLocaleDateString('en-US', {
-            month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC'
+            month: 'long', day: 'numeric', timeZone: 'UTC'
         }) : null;
+
+    const maxHours = Math.max(...data.map(d => d.hours), 1);
+    
+    const totalCells = Math.ceil(data.length / 7) * 7;
 
     return (
         <Card>
@@ -66,53 +74,53 @@ const MonthlyOverview = ({ data }) => {
                     <Ionicons name="calendar-outline" size={24} color={colors.textColor} />
                     <View style={{ marginLeft: 12, flex: 1 }}>
                         <CardTitle>Monthly Overview</CardTitle>
-                        <CardDescription>A snapshot of your entire month's work.</CardDescription>
+                        <CardDescription>
+                          {selectedDay ? `${selectedDay.hours} hours on ${formattedDate}` : "A snapshot of your entire month's work."}
+                        </CardDescription>
                     </View>
-                </View>
-                <View style={styles.tooltipContainer}>
-                    <Text style={[styles.tooltipText, { color: colors.textColor }]} numberOfLines={1}>
-                        {selectedDay ? `${selectedDay.hours} hours on ${formattedDate}` : 'Select a day to see details'}
-                    </Text>
                 </View>
             </CardHeader>
             <CardContent>
-                <View style={styles.weekDaysContainer}>
-                    {weekDays.map((day, index) => <Text key={index} style={[styles.weekDayText, { color: colors.noSessionsSubText }]}>{day}</Text>)}
-                </View>
                 <View style={styles.heatmapGrid}>
-                    {Array.from({ length: firstDayOfMonth }).map((_, index) => (
-                        <View key={`empty-${index}`} style={[styles.heatmapCell, { width: cellSize, height: cellSize }]} />
-                    ))}
-                    {data.map((day) => {
+                    {Array.from({ length: totalCells }).map((_, index) => {
+                        const day = data[index];
+
+                        if (!day) {
+                            return <View key={`empty-${index}`} style={styles.touchableCell} />;
+                        }
+
                         const isToday = isCurrentMonth && day.date === todayDateUTC;
-                        const maxHours = 8;
-                        const intensity = Math.min(day.hours / maxHours, 1);
-                        
+
                         return (
                             <TouchableOpacity
                                 key={day.date}
                                 activeOpacity={0.7}
                                 onPress={() => handleDayPress(day)}
+                                style={styles.touchableCell} // Apply sizing and padding to the touchable area
                             >
-                                <View 
+                                <View
                                     style={[
-                                        styles.heatmapCell, 
-                                        { 
-                                            width: cellSize,
-                                            height: cellSize,
-                                            backgroundColor: day.hours > 0 ? colors.accentColor : colors.modalDayButtonBg, 
-                                            opacity: day.hours > 0 ? 0.15 + (intensity * 0.85) : 1
+                                        styles.heatmapCell, // This now only controls flex and borderRadius
+                                        {
+                                            backgroundColor: getColorForHours(day.hours, maxHours, heatmapColors),
                                         },
-                                        isToday && { 
-                                            borderWidth: 1.5,
-                                            borderColor: colors.accentColor,
-                                            opacity: 1
+                                        isToday && {
+                                            borderWidth: 2,
+                                            borderColor: '#FFFFFF',
                                         }
-                                    ]} 
+                                    ]}
                                 />
                             </TouchableOpacity>
                         );
                     })}
+                </View>
+
+                <View style={styles.legendContainer}>
+                    <Text style={[styles.legendText, {color: colors.noSessionsSubText}]}>Less</Text>
+                    {[heatmapColors.level1, heatmapColors.level2, heatmapColors.level3, heatmapColors.level4].map((color, index) => (
+                        <View key={index} style={[styles.legendCell, { backgroundColor: color }]} />
+                    ))}
+                    <Text style={[styles.legendText, {color: colors.noSessionsSubText}]}>More</Text>
                 </View>
             </CardContent>
         </Card>
@@ -122,11 +130,12 @@ const MonthlyOverview = ({ data }) => {
 const styles = StyleSheet.create({
     card: {
         borderRadius: 16,
+        overflow: 'hidden',
     },
     cardHeader: {
         paddingHorizontal: 16,
         paddingTop: 16,
-        paddingBottom: 8,
+        paddingBottom: 12,
     },
     cardHeaderContainer: {
         flexDirection: 'row',
@@ -137,35 +146,37 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
     },
     cardTitle: { fontSize: 18, fontWeight: 'bold' },
-    cardDescription: { fontSize: 14, marginTop: 4 },
-    weekDaysContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 8,
-    },
-    weekDayText: {
-        textAlign: 'center',
-        fontSize: 12,
-        fontWeight: 'bold',
-        flex: 1,
-    },
+    cardDescription: { fontSize: 14, marginTop: 4, minHeight: 20 },
     heatmapGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-around'
+    },
+    // --- THE FIX IS HERE: New styling strategy ---
+    touchableCell: {
+        width: `${100 / 7}%`, // Each cell takes up exactly 1/7th of the width
+        aspectRatio: 1,      // This makes the cell a perfect square
+        padding: 2,          // Inner padding creates the gap between cells
     },
     heatmapCell: {
+        flex: 1,             // The colored view fills the padded area
         borderRadius: 4,
-        margin: 2, // Use a small, fixed margin
     },
-    tooltipContainer: {
-        height: 20,
-        marginTop: 12,
-        paddingHorizontal: 16,
+    // -----------------------------------------
+    legendContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        marginTop: 10,
     },
-    tooltipText: {
-        fontSize: 14,
-        fontWeight: '600'
+    legendText: {
+        fontSize: 12,
+        marginHorizontal: 4,
+    },
+    legendCell: {
+        width: 12,
+        height: 12,
+        borderRadius: 3,
+        marginHorizontal: 2,
     }
 });
 
