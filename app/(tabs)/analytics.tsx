@@ -42,12 +42,11 @@ export default function AnalyticsScreen() {
             const loadAnalyticsData = async () => {
                 setIsLoading(true);
                 try {
-                    // Loading real data from AsyncStorage
                     const routineStr = await AsyncStorage.getItem("studyRoutine");
                     const historyStr = await AsyncStorage.getItem("completionHistory");
                     
-                    const routine = routineStr ? JSON.parse(routineStr) : [];
                     const history = historyStr ? JSON.parse(historyStr) : [];
+                    const routine = routineStr ? JSON.parse(routineStr) : [];
                     
                     const today = new Date();
                     const todayDayIndex = today.getDay();
@@ -76,67 +75,82 @@ export default function AnalyticsScreen() {
                     const eveningPercent = eveningTasks.length > 0 ? Math.round((completedEvening / eveningTasks.length) * 100) : 0;
                     setRoutineBalanceData({ morning: morningPercent, evening: eveningPercent });
 
-                    // --- DYNAMIC Weekly & Effort Bubble Data ---
-                    const uniqueCategories = [...new Set(routine.map(task => task.category).filter(Boolean))];
-                    
-                    const colorPalette = ['#14b8a6', '#3b82f6', '#8b5cf6', '#f97316', '#ec4899', '#ef4444', '#f59e0b', '#10b981'];
-                    const categoryColors = uniqueCategories.reduce((acc, cat, index) => {
-                        acc[cat] = colorPalette[index % colorPalette.length];
-                        return acc;
-                    }, {});
 
-                    const weeklyLabels = [];
-                    const weeklyDataPoints = uniqueCategories.reduce((acc, cat) => {
-                        acc[cat] = [];
-                        return acc;
-                    }, {});
+                    // --- FINAL CODE: Grouping by TITLE ---
                     const effortDataMap = new Map();
+                    const weeklyDataPointsByTitle = new Map(); // Renamed for clarity
 
-                    // Loop for the last 7 days to show weekly data
                     for (let i = 6; i >= 0; i--) {
                         const d = new Date();
                         d.setDate(d.getDate() - i);
                         const dateStr = d.toISOString().split("T")[0];
-                        weeklyLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
                         
                         const completedOnDate = history.filter(rec => rec.completedAt.startsWith(dateStr));
 
-                        uniqueCategories.forEach(cat => {
-                            const hoursForCat = completedOnDate
-                                .filter(rec => {
-                                    const session = routine.find(s => s.id === rec.id);
-                                    return session && session.category === cat;
-                                })
-                                .reduce((sum, s) => sum + sessionDurationHours(s.start, s.end), 0);
+                        completedOnDate.forEach(rec => {
+                            const session = routine.find(s => s.id === rec.id);
                             
-                            weeklyDataPoints[cat].push(parseFloat(hoursForCat.toFixed(1)));
-                            
-                            const currentEffort = effortDataMap.get(cat) || 0;
-                            effortDataMap.set(cat, currentEffort + hoursForCat);
+                            // *** THE CHANGE IS HERE: Using rec.title instead of rec.category ***
+                            if (session && rec.title) {
+                                const hours = sessionDurationHours(session.start, session.end);
+                                
+                                // Group by title
+                                const currentTotalEffort = effortDataMap.get(rec.title) || 0;
+                                effortDataMap.set(rec.title, currentTotalEffort + hours);
+
+                                if (!weeklyDataPointsByTitle.has(rec.title)) {
+                                    weeklyDataPointsByTitle.set(rec.title, Array(7).fill(0));
+                                }
+                                weeklyDataPointsByTitle.get(rec.title)[6 - i] += hours;
+                            }
                         });
                     }
+
+                    // Get Top 5 Titles based on hours
+                    const top5Titles = Array.from(effortDataMap.entries())
+                        .sort(([, hoursA], [, hoursB]) => hoursB - hoursA)
+                        .slice(0, 5)
+                        .map(([title]) => title); // Get the title string
                     
+                    const weeklyLabels = [];
+                    for (let i = 6; i >= 0; i--) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        weeklyLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+                    }
+
                     const finalWeeklyData = weeklyLabels.map((_, dayIndex) => 
-                        uniqueCategories.map(cat => weeklyDataPoints[cat][dayIndex])
+                        top5Titles.map(title => {
+                            const titleData = weeklyDataPointsByTitle.get(title) || Array(7).fill(0);
+                            return parseFloat(titleData[dayIndex].toFixed(1));
+                        })
                     );
+
+                    const colorPalette = ['#14b8a6', '#3b82f6', '#8b5cf6', '#f97316', '#ec4899'];
+                    
+                    // Note: Colors are now assigned to titles
+                    const titleColors = top5Titles.reduce((acc, title, index) => {
+                        acc[title] = colorPalette[index % colorPalette.length];
+                        return acc;
+                    }, {});
 
                     setWeeklyChartData({
                         labels: weeklyLabels,
-                        legend: uniqueCategories,
+                        legend: top5Titles, // Legend will now show task titles
                         data: finalWeeklyData,
-                        barColors: uniqueCategories.map(cat => categoryColors[cat]),
+                        barColors: top5Titles.map(title => titleColors[title]),
                     });
-                    
+
                     const bubbleData = Array.from(effortDataMap.entries())
                         .map(([name, hours]) => ({
-                            name,
+                            name, // Here `name` is the task title
                             hours: parseFloat(hours.toFixed(1)),
-                            fill: categoryColors[name] || '#6b7280'
+                            fill: titleColors[name] || '#6b7280'
                         }))
                         .filter(item => item.hours > 0);
-
+                    
                     setEffortBubbleData(bubbleData);
-
+                    
                     // Monthly Overview Data
                     const monthData = [];
                     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
@@ -149,7 +163,6 @@ export default function AnalyticsScreen() {
                         monthData.push({ date: i, hours: hoursForDay, fullDate: d });
                     }
                     setMonthlyOverviewData(monthData);
-
 
                 } catch (err) {
                     console.error("Error loading analytics data:", err);

@@ -30,13 +30,11 @@ const WeeklyRoutineChart = ({ data }) => {
     const chartHeight = 220;
     const padding = { top: 20, right: 20, bottom: 50, left: 30 };
 
-    // Use received data. If it's empty or invalid, prepare for the "no data" message.
     const chartDataToDisplay = data && data.labels && data.labels.length > 0 ? data : { labels: [], legend: [], data: [], barColors: [] };
     
-    // Check if there's any actual data to display by summing all values.
     const totalHours = chartDataToDisplay.data.flat().reduce((sum, value) => sum + value, 0);
 
-    const yMax = 8; // Fixed Y-axis max value for better comparison
+    const yMax = Math.max(8, ...chartDataToDisplay.data.flat()) + 2; // Make Y-axis dynamic but with a minimum of 8
     const chartAreaHeight = chartHeight - padding.top - padding.bottom;
     const barWidth = chartDataToDisplay.labels.length > 0 ? ((chartWidth - padding.left - padding.right) / chartDataToDisplay.labels.length) * 0.6 : 0;
     const barMargin = chartDataToDisplay.labels.length > 0 ? ((chartWidth - padding.left - padding.right) / chartDataToDisplay.labels.length) * 0.2 : 0;
@@ -56,11 +54,10 @@ const WeeklyRoutineChart = ({ data }) => {
                 </View>
             </CardHeader>
             <CardContent>
-                {/* Conditional Rendering: Show chart if there is data, otherwise show a message */}
                 {totalHours > 0 ? (
                     <Svg width={chartWidth} height={chartHeight}>
                         {/* Y-Axis Labels and Grid Lines */}
-                        {[0, 2, 4, 6, 8].map(value => (
+                        {[0, Math.round(yMax/4), Math.round(yMax/2), Math.round(yMax*3/4), Math.round(yMax)].map(value => (
                             <React.Fragment key={value}>
                                 <SvgText
                                     x={padding.left - 10}
@@ -106,9 +103,6 @@ const WeeklyRoutineChart = ({ data }) => {
                                 const y = chartHeight - padding.bottom - barHeight - cumulativeHeight;
                                 cumulativeHeight += barHeight;
                                 
-                                // This logic correctly finds the top-most bar segment to apply rounded corners.
-                                const isTopBar = dayData.slice(catIndex + 1).reduce((a, b) => a + b, 0) === 0;
-
                                 return (
                                     <Rect
                                         key={`${dayIndex}-${catIndex}`}
@@ -117,8 +111,9 @@ const WeeklyRoutineChart = ({ data }) => {
                                         width={barWidth}
                                         height={barHeight}
                                         fill={chartDataToDisplay.barColors[catIndex]}
-                                        rx={isTopBar ? 6 : 0}
-                                        ry={isTopBar ? 6 : 0}
+                                        // *** THE FIX IS HERE: rx and ry are set to 0 to remove rounded corners ***
+                                        rx={0}
+                                        ry={0}
                                     />
                                 );
                             });
@@ -132,7 +127,7 @@ const WeeklyRoutineChart = ({ data }) => {
                     </View>
                 )}
 
-                {/* Custom Legend (also conditionally rendered) */}
+                {/* Custom Legend */}
                 {totalHours > 0 && (
                     <View style={styles.legendContainer}>
                         {chartDataToDisplay.legend.map((item, index) => (
@@ -167,15 +162,16 @@ const styles = StyleSheet.create({
     legendContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        flexWrap: 'wrap', // Allows legend items to wrap to the next line if they don't fit
+        flexWrap: 'wrap',
         marginTop: 10,
-        paddingHorizontal: 10, // Add some padding
+        paddingHorizontal: 10,
+        paddingBottom: 10, // Added padding at the bottom
     },
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
         marginHorizontal: 8,
-        marginBottom: 5, // Space for wrapped items
+        marginBottom: 5,
     },
     legendColor: {
         width: 10,
