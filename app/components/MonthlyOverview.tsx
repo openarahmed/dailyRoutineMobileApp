@@ -1,30 +1,55 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
-// Reusable Card Components
-const Card = ({ children, style = {} }) => {
-    const { colors } = useTheme();
-    return (
-        <View style={[styles.card, { backgroundColor: colors.focusCardBg || '#18202e', shadowColor: colors.shadowColor || '#000' }, style]}>
-            {children}
-        </View>
-    );
+// --- Responsive Sizing ---
+const { width } = Dimensions.get('window');
+// Base unit for scaling fonts, padding, and other UI elements.
+const FONT_SCALE = width / 100;
+
+// --- TypeScript Prop Types ---
+type CardProps = {
+    children: React.ReactNode;
+    style?: StyleProp<ViewStyle>;
 };
-const CardHeader = ({ children }) => <View style={[styles.cardHeader]}>{children}</View>;
-const CardContent = ({ children, style }) => <View style={[styles.cardContent, style]}>{children}</View>;
-const CardTitle = ({ children }) => {
+
+type CardContentProps = {
+    children: React.ReactNode;
+    style?: StyleProp<ViewStyle>;
+};
+
+type CardTextProps = {
+    children: React.ReactNode;
+};
+
+// Type for a single day's data object
+type DayData = {
+    fullDate: string;
+    date: number;
+    hours: number;
+};
+
+// --- Reusable Card Components (Now Type-Safe) ---
+const Card: React.FC<CardProps> = ({ children, style = {} }) => {
+    const { colors } = useTheme();
+    // Fixed the TypeScript error by removing the non-existent 'shadowColor' property.
+    return <View style={[styles.card, { backgroundColor: colors.focusCardBg || '#18202e' }, style]}>{children}</View>;
+};
+
+const CardHeader: React.FC<CardTextProps> = ({ children }) => <View style={styles.cardHeader}>{children}</View>;
+const CardContent: React.FC<CardContentProps> = ({ children, style }) => <View style={[styles.cardContent, style]}>{children}</View>;
+const CardTitle: React.FC<CardTextProps> = ({ children }) => {
     const { colors } = useTheme();
     return <Text style={[styles.cardTitle, { color: colors.textColor }]}>{children}</Text>;
 };
-const CardDescription = ({ children }) => {
+const CardDescription: React.FC<CardTextProps> = ({ children }) => {
     const { colors } = useTheme();
     return <Text style={[styles.cardDescription, { color: colors.noSessionsSubText }]}>{children}</Text>;
 };
 
-// Color helper function
-const getColorForHours = (hours, maxHours, colorPalette) => {
+// --- Color Helper Function ---
+const getColorForHours = (hours: number, maxHours: number, colorPalette: Record<string, string>) => {
     if (hours === 0) return colorPalette.level0;
     const percentage = hours / maxHours;
     if (percentage <= 0.25) return colorPalette.level1;
@@ -33,9 +58,10 @@ const getColorForHours = (hours, maxHours, colorPalette) => {
     return colorPalette.level4;
 };
 
-const MonthlyOverview = ({ data }) => {
+// --- Main Chart Component ---
+const MonthlyOverview = ({ data }: { data: DayData[] | null }) => {
     const { colors } = useTheme();
-    const [selectedDay, setSelectedDay] = useState(null);
+    const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
 
     const heatmapColors = {
         level0: 'rgba(128, 128, 128, 0.2)',
@@ -54,7 +80,7 @@ const MonthlyOverview = ({ data }) => {
     const firstDayDateObject = new Date(data[0].fullDate);
     const isCurrentMonth = firstDayDateObject.getUTCMonth() === today.getUTCMonth() && firstDayDateObject.getUTCFullYear() === today.getUTCFullYear();
 
-    const handleDayPress = (day) => {
+    const handleDayPress = (day: DayData) => {
         setSelectedDay(day?.hours > 0 ? day : null);
     };
 
@@ -71,11 +97,11 @@ const MonthlyOverview = ({ data }) => {
         <Card>
             <CardHeader>
                 <View style={styles.cardHeaderContainer}>
-                    <Ionicons name="calendar-outline" size={24} color={colors.textColor} />
-                    <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Ionicons name="calendar-outline" size={FONT_SCALE * 6} color={colors.textColor} />
+                    <View style={styles.headerTextContainer}>
                         <CardTitle>Monthly Overview</CardTitle>
                         <CardDescription>
-                          {selectedDay ? `${selectedDay.hours} hours on ${formattedDate}` : "A snapshot of your entire month's work."}
+                            {selectedDay ? `${selectedDay.hours} hours on ${formattedDate}` : "A snapshot of your entire month's work."}
                         </CardDescription>
                     </View>
                 </View>
@@ -96,11 +122,11 @@ const MonthlyOverview = ({ data }) => {
                                 key={day.date}
                                 activeOpacity={0.7}
                                 onPress={() => handleDayPress(day)}
-                                style={styles.touchableCell} // Apply sizing and padding to the touchable area
+                                style={styles.touchableCell}
                             >
                                 <View
                                     style={[
-                                        styles.heatmapCell, // This now only controls flex and borderRadius
+                                        styles.heatmapCell,
                                         {
                                             backgroundColor: getColorForHours(day.hours, maxHours, heatmapColors),
                                         },
@@ -131,52 +157,57 @@ const styles = StyleSheet.create({
     card: {
         borderRadius: 16,
         overflow: 'hidden',
+        width: width * 0.95, // Card takes up 95% of screen width
+        alignSelf: 'center',
+        marginTop: 10,
     },
     cardHeader: {
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 12,
+        paddingHorizontal: FONT_SCALE * 4,
+        paddingTop: FONT_SCALE * 4,
+        paddingBottom: FONT_SCALE * 3,
     },
     cardHeaderContainer: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    cardContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 16,
+    headerTextContainer: {
+        marginLeft: FONT_SCALE * 3,
+        flex: 1,
     },
-    cardTitle: { fontSize: 18, fontWeight: 'bold' },
-    cardDescription: { fontSize: 14, marginTop: 4, minHeight: 20 },
+    cardContent: {
+        paddingHorizontal: FONT_SCALE * 4,
+        paddingBottom: FONT_SCALE * 4,
+    },
+    cardTitle: { fontSize: FONT_SCALE * 4.5, fontWeight: 'bold' },
+    cardDescription: { fontSize: FONT_SCALE * 3.5, marginTop: 4, minHeight: FONT_SCALE * 5 },
     heatmapGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
     },
-    // --- THE FIX IS HERE: New styling strategy ---
     touchableCell: {
-        width: `${100 / 7}%`, // Each cell takes up exactly 1/7th of the width
-        aspectRatio: 1,      // This makes the cell a perfect square
-        padding: 2,          // Inner padding creates the gap between cells
+        width: `${100 / 7}%`,
+        aspectRatio: 1,
+        padding: FONT_SCALE * 0.5,
     },
     heatmapCell: {
-        flex: 1,             // The colored view fills the padded area
-        borderRadius: 4,
+        flex: 1,
+        borderRadius: FONT_SCALE,
     },
-    // -----------------------------------------
     legendContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'flex-end',
-        marginTop: 10,
+        marginTop: FONT_SCALE * 2.5,
     },
     legendText: {
-        fontSize: 12,
-        marginHorizontal: 4,
+        fontSize: FONT_SCALE * 3,
+        marginHorizontal: FONT_SCALE,
     },
     legendCell: {
-        width: 12,
-        height: 12,
-        borderRadius: 3,
-        marginHorizontal: 2,
+        width: FONT_SCALE * 3,
+        height: FONT_SCALE * 3,
+        borderRadius: FONT_SCALE * 0.75,
+        marginHorizontal: FONT_SCALE * 0.5,
     }
 });
 

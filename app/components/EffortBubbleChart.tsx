@@ -1,26 +1,66 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
-// Reusable Card Components (No changes needed)
-const Card = ({ children, style = {} }) => {
-    const { colors } = useTheme();
-    return <View style={[styles.card, { backgroundColor: colors.focusCardBg || '#18202e', shadowColor: colors.shadowColor || '#000' }, style]}>{children}</View>;
+// --- Responsive Sizing ---
+const { width } = Dimensions.get('window');
+// Base unit for scaling fonts, padding, and other UI elements.
+const FONT_SCALE = width / 100;
+
+// --- TypeScript Prop Types ---
+type CardProps = {
+    children: React.ReactNode;
+    style?: StyleProp<ViewStyle>;
 };
-const CardHeader = ({ children }) => <View style={styles.cardHeader}>{children}</View>;
-const CardContent = ({ children, style }) => <View style={[styles.cardContent, style]}>{children}</View>;
-const CardTitle = ({ children }) => {
+
+type CardContentProps = {
+    children: React.ReactNode;
+    style?: StyleProp<ViewStyle>;
+};
+
+type CardTextProps = {
+    children: React.ReactNode;
+};
+
+// Type for the raw data passed to the chart
+type EffortChartData = {
+    name: string;
+    hours: number;
+    fill: string;
+};
+
+// Type for the internal state of a bubble, including position and velocity
+type BubbleState = {
+    name: string;
+    fill: string;
+    avgHours: number;
+    size: number;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+};
+
+// --- Reusable Card Components (Now Type-Safe) ---
+const Card: React.FC<CardProps> = ({ children, style = {} }) => {
+    const { colors } = useTheme();
+    return <View style={[styles.card, { backgroundColor: colors.focusCardBg || '#18202e' }, style]}>{children}</View>;
+};
+
+const CardHeader: React.FC<CardTextProps> = ({ children }) => <View style={styles.cardHeader}>{children}</View>;
+const CardContent: React.FC<CardContentProps> = ({ children, style }) => <View style={[styles.cardContent, style]}>{children}</View>;
+const CardTitle: React.FC<CardTextProps> = ({ children }) => {
     const { colors } = useTheme();
     return <Text style={[styles.cardTitle, { color: colors.textColor }]}>{children}</Text>;
 };
-const CardDescription = ({ children }) => {
+const CardDescription: React.FC<CardTextProps> = ({ children }) => {
     const { colors } = useTheme();
     return <Text style={[styles.cardDescription, { color: colors.noSessionsSubText }]}>{children}</Text>;
 };
 
-// Bubble component now only shows hours
-const Bubble = ({ bubbleData }) => {
+// --- Bubble Component ---
+const Bubble = ({ bubbleData }: { bubbleData: BubbleState }) => {
     return (
         <View style={[
             styles.bubble,
@@ -32,19 +72,20 @@ const Bubble = ({ bubbleData }) => {
                 transform: [{ translateX: bubbleData.x }, { translateY: bubbleData.y }],
             }
         ]}>
-            {/* --- CHANGE: Only showing hours now, and bigger font --- */}
-            <Text style={styles.bubbleText}>{`${bubbleData.avgHours}h`}</Text>
+            <Text style={[styles.bubbleText, { fontSize: bubbleData.size * 0.25 }]}>{`${bubbleData.avgHours}h`}</Text>
         </View>
     );
 };
 
-const EffortBubbleChart = ({ data }) => {
+// --- Main Chart Component ---
+const EffortBubbleChart = ({ data }: { data: EffortChartData[] | null }) => {
     const { colors } = useTheme();
-    const [bubbles, setBubbles] = useState([]);
-    const animationFrameId = useRef(null);
+    const [bubbles, setBubbles] = useState<BubbleState[]>([]);
+    const animationFrameId = useRef<number | null>(null);
     
-    const chartHeight = 250;
-    const chartWidth = Dimensions.get('window').width - 32;
+    // --- Responsive Chart Dimensions ---
+    const chartWidth = width * 0.9;
+    const chartHeight = width * 0.65;
 
     useEffect(() => {
         if (!data || data.length === 0 || chartWidth === 0) {
@@ -52,7 +93,7 @@ const EffortBubbleChart = ({ data }) => {
             return;
         }
 
-        const topEffortData = data.sort((a, b) => b.hours - a.hours).slice(0, 5);
+        const topEffortData = [...data].sort((a, b) => b.hours - a.hours).slice(0, 5);
         if (topEffortData.length === 0) {
             setBubbles([]);
             return;
@@ -60,8 +101,9 @@ const EffortBubbleChart = ({ data }) => {
 
         const maxHours = topEffortData[0].hours || 1;
 
-        const initializedBubbles = topEffortData.map(d => {
-            const size = 60 + (d.hours / maxHours) * 80;
+        const initializedBubbles: BubbleState[] = topEffortData.map(d => {
+            // Bubble size is now responsive
+            const size = (FONT_SCALE * 15) + (d.hours / maxHours) * (FONT_SCALE * 20);
             return {
                 name: d.name,
                 fill: d.fill,
@@ -76,7 +118,7 @@ const EffortBubbleChart = ({ data }) => {
         
         setBubbles(initializedBubbles);
 
-    }, [data]);
+    }, [data, chartWidth, chartHeight]);
 
     useEffect(() => {
         if (bubbles.length === 0) return;
@@ -87,6 +129,7 @@ const EffortBubbleChart = ({ data }) => {
                 
                 const newBubbles = currentBubbles.map(b => ({ ...b }));
 
+                // Collision detection and resolution logic (no changes needed here)
                 for (let i = 0; i < newBubbles.length; i++) {
                     for (let j = i + 1; j < newBubbles.length; j++) {
                         const bubble1 = newBubbles[i];
@@ -141,14 +184,14 @@ const EffortBubbleChart = ({ data }) => {
                 cancelAnimationFrame(animationFrameId.current);
             }
         };
-    }, [bubbles.length]);
+    }, [bubbles.length, chartWidth, chartHeight]);
 
     return (
         <Card>
             <CardHeader>
                 <View style={styles.cardHeaderContainer}>
-                    <Ionicons name="apps-outline" size={24} color={colors.textColor} />
-                    <View style={{ marginLeft: 12 }}>
+                    <Ionicons name="apps-outline" size={FONT_SCALE * 6} color={colors.textColor} />
+                    <View style={styles.headerTextContainer}>
                         <CardTitle>Effort Balance</CardTitle>
                         <CardDescription>Your top 5 focus areas (avg daily hours).</CardDescription>
                     </View>
@@ -159,12 +202,11 @@ const EffortBubbleChart = ({ data }) => {
                     <Bubble key={bubble.name} bubbleData={bubble} />
                 )) : (
                     <View style={styles.placeholder}>
-                        <Text style={{color: colors.noSessionsSubText}}>Not enough data for effort balance.</Text>
+                        <Text style={[styles.placeholderText, {color: colors.noSessionsSubText}]}>Not enough data for effort balance.</Text>
                     </View>
                 )}
             </CardContent>
             
-            {/* --- NEW: Legend Section Added Here --- */}
             {bubbles.length > 0 && (
                 <View style={styles.legendContainer}>
                     {bubbles.map(bubble => (
@@ -180,23 +222,30 @@ const EffortBubbleChart = ({ data }) => {
 };
 
 const styles = StyleSheet.create({
-    card: { borderRadius: 16, alignSelf: 'center', marginTop: 10 },
-    cardHeader: { padding: 16, paddingBottom: 8 },
+    card: { 
+        borderRadius: 16, 
+        alignSelf: 'center', 
+        marginTop: 10,
+        width: width * 0.95, // Card takes up 95% of screen width
+    },
+    cardHeader: { 
+        padding: FONT_SCALE * 4, 
+        paddingBottom: FONT_SCALE * 2 
+    },
     cardHeaderContainer: { flexDirection: 'row', alignItems: 'center' },
-    cardContent: { padding: 0, overflow: 'hidden' },
-    cardTitle: { fontSize: 18, fontWeight: 'bold' },
-    cardDescription: { fontSize: 14, marginTop: 4 },
+    headerTextContainer: { marginLeft: FONT_SCALE * 3, flex: 1 },
+    cardContent: { padding: 0, overflow: 'hidden', alignSelf: 'center' },
+    cardTitle: { fontSize: FONT_SCALE * 4.5, fontWeight: 'bold' },
+    cardDescription: { fontSize: FONT_SCALE * 3.5, marginTop: 4 },
     chartContainer: { position: 'relative' },
     bubble: {
         position: 'absolute',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 5,
     },
     bubbleText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 16, // Font size increased
         textAlign: 'center',
     },
     placeholder: {
@@ -204,29 +253,31 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    // --- NEW: Styles for the Legend ---
+    placeholderText: {
+        fontSize: FONT_SCALE * 3.5,
+    },
     legendContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         flexWrap: 'wrap',
-        marginTop: 10,
-        paddingHorizontal: 10,
-        paddingBottom: 16,
+        marginTop: FONT_SCALE * 2.5,
+        paddingHorizontal: FONT_SCALE * 2.5,
+        paddingBottom: FONT_SCALE * 4,
     },
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: 8,
-        marginBottom: 5,
+        marginHorizontal: FONT_SCALE * 2,
+        marginBottom: FONT_SCALE * 1.25,
     },
     legendColor: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        marginRight: 6,
+        width: FONT_SCALE * 2.5,
+        height: FONT_SCALE * 2.5,
+        borderRadius: FONT_SCALE * 1.25,
+        marginRight: FONT_SCALE * 1.5,
     },
     legendText: {
-        fontSize: 12,
+        fontSize: FONT_SCALE * 3,
     },
 });
 

@@ -1,53 +1,88 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Line, Rect, Svg, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 
-// Reusable Card Components
-const Card = ({ children, style = {} }) => {
+// --- Responsive Sizing ---
+const { width } = Dimensions.get('window');
+// Base unit for scaling fonts, padding, and other UI elements.
+const FONT_SCALE = width / 100;
+
+// --- TypeScript Prop Types ---
+type CardProps = {
+    children: React.ReactNode;
+    style?: StyleProp<ViewStyle>;
+};
+
+type CardContentProps = {
+    children: React.ReactNode;
+    style?: StyleProp<ViewStyle>;
+};
+
+type CardTextProps = {
+    children: React.ReactNode;
+};
+
+// Define a comprehensive type for the chart data prop.
+type WeeklyChartData = {
+    labels: string[];
+    legend: string[];
+    data: number[][];
+    barColors: string[];
+};
+
+// --- Reusable Card Components (Now Type-Safe) ---
+const Card: React.FC<CardProps> = ({ children, style = {} }) => {
     const { colors } = useTheme();
+    // Fixed the TypeScript error by removing the non-existent 'shadowColor' property.
     return (
-        <View style={[styles.card, { backgroundColor: colors.focusCardBg || '#18202e', shadowColor: colors.shadowColor || '#000' }, style]}>
+        <View style={[styles.card, { backgroundColor: colors.focusCardBg || '#18202e' }, style]}>
             {children}
         </View>
     );
 };
-const CardHeader = ({ children }) => <View style={[styles.cardHeader]}>{children}</View>;
-const CardContent = ({ children, style }) => <View style={[styles.cardContent, style]}>{children}</View>;
-const CardTitle = ({ children }) => {
+
+const CardHeader: React.FC<CardTextProps> = ({ children }) => <View style={[styles.cardHeader]}>{children}</View>;
+
+const CardContent: React.FC<CardContentProps> = ({ children, style }) => <View style={[styles.cardContent, style]}>{children}</View>;
+
+const CardTitle: React.FC<CardTextProps> = ({ children }) => {
     const { colors } = useTheme();
     return <Text style={[styles.cardTitle, { color: colors.textColor }]}>{children}</Text>;
 };
-const CardDescription = ({ children }) => {
+
+const CardDescription: React.FC<CardTextProps> = ({ children }) => {
     const { colors } = useTheme();
     return <Text style={[styles.cardDescription, { color: colors.noSessionsSubText }]}>{children}</Text>;
 };
 
-const WeeklyRoutineChart = ({ data }) => {
+const WeeklyRoutineChart = ({ data }: { data: WeeklyChartData | null }) => {
     const { colors } = useTheme();
-    const chartWidth = Dimensions.get('window').width - 62;
-    const chartHeight = 220;
-    const padding = { top: 20, right: 20, bottom: 50, left: 30 };
+
+    // --- Responsive Chart Dimensions ---
+    const chartWidth = width * 0.9; // Chart takes up 90% of screen width
+    const chartHeight = width * 0.6; // Height is proportional to width
+    const padding = { top: FONT_SCALE * 5, right: FONT_SCALE * 5, bottom: FONT_SCALE * 12, left: FONT_SCALE * 8 };
 
     const chartDataToDisplay = data && data.labels && data.labels.length > 0 ? data : { labels: [], legend: [], data: [], barColors: [] };
     
     const totalHours = chartDataToDisplay.data.flat().reduce((sum, value) => sum + value, 0);
 
-    const yMax = Math.max(8, ...chartDataToDisplay.data.flat()) + 2; // Make Y-axis dynamic but with a minimum of 8
+    const yMax = Math.max(8, ...chartDataToDisplay.data.flat()) + 2;
     const chartAreaHeight = chartHeight - padding.top - padding.bottom;
     const barWidth = chartDataToDisplay.labels.length > 0 ? ((chartWidth - padding.left - padding.right) / chartDataToDisplay.labels.length) * 0.6 : 0;
     const barMargin = chartDataToDisplay.labels.length > 0 ? ((chartWidth - padding.left - padding.right) / chartDataToDisplay.labels.length) * 0.2 : 0;
 
-    const xPoint = (index) => padding.left + (index * (barWidth + barMargin * 2)) + barMargin;
-    const yPoint = (value) => chartHeight - padding.bottom - (value / yMax) * chartAreaHeight;
+    const xPoint = (index: number) => padding.left + (index * (barWidth + barMargin * 2)) + barMargin;
+    const yPoint = (value: number) => chartHeight - padding.bottom - (value / yMax) * chartAreaHeight;
 
     return (
         <Card>
             <CardHeader>
                 <View style={styles.cardHeaderContainer}>
-                    <Ionicons name="bar-chart-outline" size={24} color={colors.textColor} />
-                    <View style={{ marginLeft: 12 }}>
+                    <Ionicons name="bar-chart-outline" size={FONT_SCALE * 6} color={colors.textColor} />
+                    <View style={styles.headerTextContainer}>
                         <CardTitle>Weekly Routine Breakdown</CardTitle>
                         <CardDescription>How you've invested your time.</CardDescription>
                     </View>
@@ -63,7 +98,7 @@ const WeeklyRoutineChart = ({ data }) => {
                                     x={padding.left - 10}
                                     y={yPoint(value) + 4}
                                     fill={colors.noSessionsSubText}
-                                    fontSize="12"
+                                    fontSize={FONT_SCALE * 3}
                                     textAnchor="end"
                                 >
                                     {value}
@@ -84,9 +119,9 @@ const WeeklyRoutineChart = ({ data }) => {
                             <SvgText
                                 key={index}
                                 x={xPoint(index) + barWidth / 2}
-                                y={chartHeight - padding.bottom + 20}
+                                y={chartHeight - padding.bottom + FONT_SCALE * 5}
                                 fill={colors.noSessionsSubText}
-                                fontSize="12"
+                                fontSize={FONT_SCALE * 3}
                                 textAnchor="middle"
                             >
                                 {label}
@@ -111,17 +146,16 @@ const WeeklyRoutineChart = ({ data }) => {
                                         width={barWidth}
                                         height={barHeight}
                                         fill={chartDataToDisplay.barColors[catIndex]}
-                                        // *** THE FIX IS HERE: rx and ry are set to 0 to remove rounded corners ***
-                                        rx={0}
-                                        ry={0}
+                                        rx={FONT_SCALE * 0.5} // Subtle rounded corners
+                                        ry={FONT_SCALE * 0.5}
                                     />
                                 );
                             });
                         })}
                     </Svg>
                 ) : (
-                    <View style={{ height: chartHeight, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
-                        <Text style={{ color: colors.noSessionsSubText, fontSize: 14, textAlign: 'center' }}>
+                    <View style={[styles.noDataContainer, { height: chartHeight }]}>
+                        <Text style={[styles.noDataText, { color: colors.noSessionsSubText }]}>
                             No activity recorded for the past week. Complete some tasks to see your progress!
                         </Text>
                     </View>
@@ -146,41 +180,58 @@ const WeeklyRoutineChart = ({ data }) => {
 const styles = StyleSheet.create({
     card: {
         borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     cardHeader: {
-        padding: 16,
+        padding: FONT_SCALE * 4,
     },
     cardHeaderContainer: {
         flexDirection: 'row',
         alignItems: 'center',
     },
+    headerTextContainer: {
+        marginLeft: FONT_SCALE * 3,
+    },
     cardContent: {
         alignItems: 'center',
     },
-    cardTitle: { fontSize: 18, fontWeight: 'bold' },
-    cardDescription: { fontSize: 14, marginTop: 4 },
+    cardTitle: { fontSize: FONT_SCALE * 4.5, fontWeight: 'bold' },
+    cardDescription: { fontSize: FONT_SCALE * 3.5, marginTop: 4 },
+    noDataContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: FONT_SCALE * 5,
+    },
+    noDataText: {
+        fontSize: FONT_SCALE * 3.5,
+        textAlign: 'center',
+    },
     legendContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         flexWrap: 'wrap',
-        marginTop: 10,
-        paddingHorizontal: 10,
-        paddingBottom: 10, // Added padding at the bottom
+        marginTop: FONT_SCALE * 2.5,
+        paddingHorizontal: FONT_SCALE * 2.5,
+        paddingBottom: FONT_SCALE * 2.5,
     },
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: 8,
-        marginBottom: 5,
+        marginHorizontal: FONT_SCALE * 2,
+        marginBottom: FONT_SCALE * 1.25,
     },
     legendColor: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        marginRight: 5,
+        width: FONT_SCALE * 2.5,
+        height: FONT_SCALE * 2.5,
+        borderRadius: FONT_SCALE * 1.25,
+        marginRight: FONT_SCALE * 1.25,
     },
     legendText: {
-        fontSize: 12,
+        fontSize: FONT_SCALE * 3,
     },
 });
 
